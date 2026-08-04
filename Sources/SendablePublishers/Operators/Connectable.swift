@@ -1,0 +1,54 @@
+//
+//  Connectable.swift
+//  SendablePublishers
+//
+//  Created by Dmitriy Ignatyev on 05.08.2026.
+//
+
+extension SendablePublisher_ {
+  @export(implementation)
+  public func multicast<S: Subject & Sendable>(
+    _ createSubject: @escaping () -> S
+  ) -> SendablePublisher_<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
+    let multicast = Publishers.Multicast(upstream: self._base, createSubject: createSubject)
+    return SendablePublisher_<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
+  }
+  
+  @export(implementation)
+  public func multicast<S: Subject & Sendable>(
+    subject: S
+  ) -> SendablePublisher_<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
+    let multicast = self._base.multicast(subject: subject)
+    return SendablePublisher_<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
+  }
+  
+  @export(implementation)
+  public func makeConnectable() -> ConnectableSendablePublisher<Upstream> {
+    ConnectableSendablePublisher(sendablePublisher_: self)
+  }
+}
+
+public struct ConnectableSendablePublisher<Upstream: Publisher>: Publisher where Upstream.Output: Sendable {
+  public typealias Output = Upstream.Output
+  public typealias Failure = Upstream.Failure
+  
+  @usableFromInline
+  internal let _connectable: Publishers.MakeConnectable<Upstream>
+  
+  @export(implementation)
+  internal init(sendablePublisher_: SendablePublisher_<Upstream>) {
+    self._connectable = Publishers.MakeConnectable(upstream: sendablePublisher_._base)
+  }
+  
+  @export(implementation)
+  public func receive<S>(subscriber: S) where S: Subscriber, Failure == S.Failure, Output == S.Input {
+    _connectable.receive(subscriber: subscriber)
+  }
+  
+  @export(implementation)
+  public func connect() -> any Cancellable {
+    _connectable.connect()
+  }
+}
+
+extension ConnectableSendablePublisher: @unchecked Sendable {}
