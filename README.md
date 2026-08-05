@@ -174,7 +174,7 @@ final class MapViewModel {
 
 ## Design
 
-**Why a wrapper and not a rewrite.** The hard part of a reactive stream is the engine: threading, backpressure, cancellation. Combine already does this at Apple's performance level. This library puts a concurrency contract on top of that engine; it does not rebuild it. The footprint reflects that – the whole library compiles to roughly 45 KB in release, mostly protocol conformances and forwarding thunks. That is the price of a thin wrapping, and this is the point.
+**Why a wrapper and not a rewrite.** The hard part of a reactive stream is the engine: threading, backpressure, cancellation. Combine already does this at Apple's performance level. This library puts a concurrency contract on top of that engine; it does not rebuild it. The footprint reflects that – the whole library compiles to roughly 68 KB in release, mostly protocol conformances and forwarding thunks. That is the price of a thin wrapping, and this is the point.
 
 **Why `@unchecked Sendable`.** Swift cannot inspect Combine's internal locks, so the conformance is asserted rather than proven. This is a statement of trust in Apple's implementation, not an escape hatch from a problem. The wrapper adds nothing mutable, so whatever is safe inside Combine stays safe here.
 
