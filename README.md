@@ -13,7 +13,7 @@ Built with Swift 6 and the Swift 6 language mode. Wraps Combine. Reimplements no
 ## Highlights
 
 - **`SendablePublisher<Output, Failure>`** – a real, `Sendable` type for your signatures.
-- **`SendablePublisher_<Upstream>`** – an opaque wrapper that preserves the upstream type. No erasure, no runtime cost.
+- **`SendableShell<Upstream>`** – an opaque wrapper that preserves the upstream type. No erasure, no runtime cost.
 - **`@Sendable` everywhere** – every operator takes a `@Sendable` closure, so the compiler checks your chains instead of you.
 - **Subjects become `Sendable`** – through a retroactive conformance that Combine's own thread-safety justifies.
 - **Zero machinery, ~68 KB in release** – runtime behavior is Combine's. The whole library is a thin overlay; there is no custom subscription code to get wrong.
@@ -55,7 +55,7 @@ public typealias SendablePublisher<Output: Sendable, Failure> =
   Publisher<Output, Failure> & Sendable
 ```
 
-Second, a concrete wrapper, `SendablePublisher_<Upstream>`. A thin `@unchecked Sendable` struct that forwards `receive(subscriber:)` to the wrapped publisher and keeps the concrete type intact. No erasure, no overhead – just a `Sendable` overlay around a pipeline.
+Second, a concrete wrapper, `SendableShell<Upstream>`. A thin `@unchecked Sendable` struct that forwards `receive(subscriber:)` to the wrapped publisher and keeps the concrete type intact. No erasure, no overhead – just a `Sendable` overlay around a pipeline.
 
 Third, a retroactive conformance for the two subjects you already use:
 
@@ -71,7 +71,7 @@ import Combine
 import SendablePublishers
 
 let subject = PassthroughSubject<Int, Never>() // now Sendable
-let events = subject.asSendablePublisher()      // SendablePublisher_<...>, also Sendable
+let events = subject.asSendablePublisher()      // SendableShell<...>, also Sendable
 
 Task { @MainActor in
   subject.send(1)
@@ -90,13 +90,13 @@ The library is not closed off. If your project needs a case it does not cover, t
 @_spi(ExtensionsUnsafeAPI) import SendablePublishers
 
 // Wrap a custom publisher after proving it is thread-safe.
-let wrapped = SendablePublisher_(unverified_SendablePublisher: myPublisher)
+let wrapped = SendableShell(unverified_SendablePublisher: myPublisher)
 
 // Add an operator of your own to the wrapper.
-extension SendablePublisher_ {
-  func toggle() -> SendablePublisher_<Publishers.Map<Upstream, Bool>> {
+extension SendableShell {
+  func toggle() -> SendableShell<Publishers.Map<Upstream, Bool>> {
     let toggled = _upstream.map { !$0 }
-    return SendablePublisher_<Publishers.Map<Upstream, Bool>>(unverified_SendablePublisher: toggled)
+    return SendableShell<Publishers.Map<Upstream, Bool>>(unverified_SendablePublisher: toggled)
   }
 }
 ```
@@ -140,7 +140,7 @@ struct Coordinates: Sendable, Equatable {
 
 // A service owns the subject; callers receive a Sendable view of it.
 final class LocationService {
-  let coordinates: SendablePublisher_<PassthroughSubject<Coordinates, Never>>
+  let coordinates: SendableShell<PassthroughSubject<Coordinates, Never>>
 
   init() {
     let subject = PassthroughSubject<Coordinates, Never>()
@@ -236,11 +236,11 @@ One caveat shared by both: after hiding, the value is a `Publisher & Sendable` y
 ### Creating
 
 ```swift
-let one: SendablePublisher_<Just<Int>> = .just(1)
-let empty: SendablePublisher_<Empty<Int, Never>> = .empty()
-let failure: SendablePublisher_<Fail<Int, URLError>> = .fail(.init(.timedOut))
-let ticks: SendablePublisher_<Timer.TimerPublisher> = .timer(interval: 1, runLoop: .main)
-let numbers: SendablePublisher_<Publishers.Sequence<[Int], Never>> = .sequence([1, 2, 3])
+let one: SendableShell<Just<Int>> = .just(1)
+let empty: SendableShell<Empty<Int, Never>> = .empty()
+let failure: SendableShell<Fail<Int, URLError>> = .fail(.init(.timedOut))
+let ticks: SendableShell<Timer.TimerPublisher> = .timer(interval: 1, runLoop: .main)
+let numbers: SendableShell<Publishers.Sequence<[Int], Never>> = .sequence([1, 2, 3])
 ```
 
 ### Transforming
@@ -272,16 +272,16 @@ let merged = liveFeed
 ```swift
 let loaded = network
   .retry(3)                                               // transient failures
-  .catch { _ in SendablePublisher_<Just<[Post]>>.just([]) } // then fall back
+  .catch { _ in SendableShell<Just<[Post]>>.just([]) } // then fall back
 
 let saved = form
   .timeout(.seconds(5), scheduler: DispatchQueue.main) { URLError(.timedOut) }
-  .catch { error in SendablePublisher_<Just<Data>>.just(Data()) }
+  .catch { error in SendableShell<Just<Data>>.just(Data()) }
 ```
 
 ## Operators
 
-Every operator wraps its Combine counterpart and returns `SendablePublisher_`, so chains stay `Sendable` end to end. Closures are `@Sendable` unless marked otherwise.
+Every operator wraps its Combine counterpart and returns `SendableShell`, so chains stay `Sendable` end to end. Closures are `@Sendable` unless marked otherwise.
 
 | Group | Operators |
 |---|---|

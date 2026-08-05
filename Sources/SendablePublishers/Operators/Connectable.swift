@@ -24,7 +24,7 @@ extension SendableShell {
 
   @export(implementation)
   public func makeConnectable() -> ConnectableSendablePublisher<Upstream> {
-    ConnectableSendablePublisher(sendablePublisher_: self)
+    ConnectableSendablePublisher(sendableShell: self)
   }
 }
 
@@ -36,8 +36,8 @@ public struct ConnectableSendablePublisher<Upstream: Publisher>: Publisher where
   internal let _connectable: Publishers.MakeConnectable<Upstream>
 
   @export(implementation)
-  internal init(sendablePublisher_: SendableShell<Upstream>) {
-    _connectable = Publishers.MakeConnectable(upstream: sendablePublisher_._base)
+  internal init(sendableShell: SendableShell<Upstream>) {
+    _connectable = Publishers.MakeConnectable(upstream: sendableShell._base)
   }
 
   @export(implementation)
