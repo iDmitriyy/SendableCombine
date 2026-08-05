@@ -5,10 +5,10 @@
 //  Created by Dmitriy Ignatyev on 05.08.2026.
 //
 
-extension SendablePublisher_ {
+extension SendableShell {
   @export(implementation)
-  public func share() -> SendablePublisher_<Publishers.Share<Upstream>> {
+  public func share() -> SendableShell<Publishers.Share<Upstream>> {
     let shared = Publishers.Share(upstream: self._base)
-    return SendablePublisher_<Publishers.Share<Upstream>>(_unverified_SendablePublisher__: shared)
+    return SendableShell<Publishers.Share<Upstream>>(_unverified_SendablePublisher__: shared)
   }
 }

@@ -5,21 +5,21 @@
 //  Created by Dmitriy Ignatyev on 05.08.2026.
 //
 
-extension SendablePublisher_ {
+extension SendableShell {
   @export(implementation)
   public func multicast<S: Subject & Sendable>(
     _ createSubject: @escaping () -> S
-  ) -> SendablePublisher_<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
+  ) -> SendableShell<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
     let multicast = Publishers.Multicast(upstream: self._base, createSubject: createSubject)
-    return SendablePublisher_<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
+    return SendableShell<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
   }
   
   @export(implementation)
   public func multicast<S: Subject & Sendable>(
     subject: S
-  ) -> SendablePublisher_<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
+  ) -> SendableShell<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
     let multicast = self._base.multicast(subject: subject)
-    return SendablePublisher_<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
+    return SendableShell<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
   }
   
   @export(implementation)
@@ -36,7 +36,7 @@ public struct ConnectableSendablePublisher<Upstream: Publisher>: Publisher where
   internal let _connectable: Publishers.MakeConnectable<Upstream>
   
   @export(implementation)
-  internal init(sendablePublisher_: SendablePublisher_<Upstream>) {
+  internal init(sendablePublisher_: SendableShell<Upstream>) {
     self._connectable = Publishers.MakeConnectable(upstream: sendablePublisher_._base)
   }
   

@@ -5,7 +5,7 @@
 //  Created by Dmitriy Ignatyev on 05.08.2026.
 //
 
-extension SendablePublisher_ {
+extension SendableShell {
   @export(implementation)
   public func handleEvents(
     receiveSubscription: (@Sendable (any Subscription) -> Void)? = nil,
@@ -13,14 +13,14 @@ extension SendablePublisher_ {
     receiveCompletion: (@Sendable (Subscribers.Completion<Failure>) -> Void)? = nil,
     receiveCancel: (@Sendable () -> Void)? = nil,
     receiveRequest: (@Sendable (Subscribers.Demand) -> Void)? = nil
-  ) -> SendablePublisher_<Publishers.HandleEvents<Upstream>> {
+  ) -> SendableShell<Publishers.HandleEvents<Upstream>> {
     let handled = Publishers.HandleEvents(upstream: self._base,
                                           receiveSubscription: receiveSubscription,
                                           receiveOutput: receiveOutput,
                                           receiveCompletion: receiveCompletion,
                                           receiveCancel: receiveCancel,
                                           receiveRequest: receiveRequest)
-    return SendablePublisher_<Publishers.HandleEvents<Upstream>>(_unverified_SendablePublisher__: handled)
+    return SendableShell<Publishers.HandleEvents<Upstream>>(_unverified_SendablePublisher__: handled)
   }
 }
 
@@ -39,7 +39,7 @@ extension Publisher where Self: Sendable, Output: Sendable, Failure == Never {
   }
 }
 
-extension SendablePublisher_ {
+extension SendableShell {
   @export(implementation)
   public func assign<Root: Sendable>(to keyPath: ReferenceWritableKeyPath<Root, Output>,
                                      on object: Root) -> AnyCancellable where Failure == Never {
@@ -50,8 +50,8 @@ extension SendablePublisher_ {
   public func print(
     _ prefix: String = "",
     to stream: (any TextOutputStream)? = nil
-  ) -> SendablePublisher_<Publishers.Print<Upstream>> {
+  ) -> SendableShell<Publishers.Print<Upstream>> {
     let printed = Publishers.Print(upstream: self._base, prefix: prefix, to: stream)
-    return SendablePublisher_<Publishers.Print<Upstream>>(_unverified_SendablePublisher__: printed)
+    return SendableShell<Publishers.Print<Upstream>>(_unverified_SendablePublisher__: printed)
   }
 }
