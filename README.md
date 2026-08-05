@@ -16,7 +16,7 @@ Built with Swift 6 and the Swift 6 language mode. Wraps Combine. Reimplements no
 - **`SendablePublisher_<Upstream>`** – an opaque wrapper that preserves the upstream type. No erasure, no runtime cost.
 - **`@Sendable` everywhere** – every operator takes a `@Sendable` closure, so the compiler checks your chains instead of you.
 - **Subjects become `Sendable`** – through a retroactive conformance that Combine's own thread-safety justifies.
-- **Zero machinery, ~45 KB in release** – runtime behavior is Combine's. The whole library is a thin seal; there is no custom subscription code to get wrong.
+- **Zero machinery, ~68 KB in release** – runtime behavior is Combine's. The whole library is a thin overlay; there is no custom subscription code to get wrong.
 - **Actively developed** – `Driver` / `Signal` traits, `CancellationBag`, and AsyncAlgorithms interop are on the roadmap; see [Future Directions](#future-directions).
 
 ## The Problem
@@ -55,7 +55,7 @@ public typealias SendablePublisher<Output: Sendable, Failure> =
   Publisher<Output, Failure> & Sendable
 ```
 
-Second, a concrete wrapper, `SendablePublisher_<Upstream>`. A thin `@unchecked Sendable` struct that forwards `receive(subscriber:)` to the wrapped publisher and keeps the concrete type intact. No erasure, no overhead – just a `Sendable` seal around a pipeline.
+Second, a concrete wrapper, `SendablePublisher_<Upstream>`. A thin `@unchecked Sendable` struct that forwards `receive(subscriber:)` to the wrapped publisher and keeps the concrete type intact. No erasure, no overhead – just a `Sendable` overlay around a pipeline.
 
 Third, a retroactive conformance for the two subjects you already use:
 
@@ -89,7 +89,7 @@ The library is not closed off. If your project needs a case it does not cover, t
 ```swift
 @_spi(ExtensionsUnsafeAPI) import SendablePublishers
 
-// Seal a custom publisher after proving it is thread-safe.
+// Wrap a custom publisher after proving it is thread-safe.
 let wrapped = SendablePublisher_(unverified_SendablePublisher: myPublisher)
 
 // Add an operator of your own to the wrapper.
@@ -162,7 +162,7 @@ final class MapViewModel {
   init(locationService: LocationService) {
     locationService.coordinates
       .filter { $0.latitude != 0 }
-      .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+      .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
       .map { "\($0.latitude), \($0.longitude)" }
       .assign(to: \.statusText, on: self)   // Failure == Never, so assign is allowed
       .store(in: &cancellables)
@@ -174,7 +174,7 @@ final class MapViewModel {
 
 ## Design
 
-**Why a wrapper and not a rewrite.** The hard part of a reactive stream is the engine: threading, backpressure, cancellation. Combine already does this at Apple's performance level. This library puts a concurrency contract on top of that engine; it does not rebuild it. The footprint reflects that – the whole library compiles to roughly 45 KB in release, mostly protocol conformances and forwarding thunks. That is the price of a thin seal, and it is the point.
+**Why a wrapper and not a rewrite.** The hard part of a reactive stream is the engine: threading, backpressure, cancellation. Combine already does this at Apple's performance level. This library puts a concurrency contract on top of that engine; it does not rebuild it. The footprint reflects that – the whole library compiles to roughly 45 KB in release, mostly protocol conformances and forwarding thunks. That is the price of a thin wrapping, and this is the point.
 
 **Why `@unchecked Sendable`.** Swift cannot inspect Combine's internal locks, so the conformance is asserted rather than proven. This is a statement of trust in Apple's implementation, not an escape hatch from a problem. The wrapper adds nothing mutable, so whatever is safe inside Combine stays safe here.
 

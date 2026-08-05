@@ -8,20 +8,20 @@
 extension SendableShell {
   @export(implementation)
   public func multicast<S: Subject & Sendable>(
-    _ createSubject: @escaping () -> S
+    _ createSubject: @escaping () -> S,
   ) -> SendableShell<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
-    let multicast = Publishers.Multicast(upstream: self._base, createSubject: createSubject)
+    let multicast = Publishers.Multicast(upstream: _base, createSubject: createSubject)
     return SendableShell<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
   }
-  
+
   @export(implementation)
   public func multicast<S: Subject & Sendable>(
-    subject: S
+    subject: S,
   ) -> SendableShell<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
-    let multicast = self._base.multicast(subject: subject)
+    let multicast = _base.multicast(subject: subject)
     return SendableShell<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
   }
-  
+
   @export(implementation)
   public func makeConnectable() -> ConnectableSendablePublisher<Upstream> {
     ConnectableSendablePublisher(sendablePublisher_: self)
@@ -31,20 +31,20 @@ extension SendableShell {
 public struct ConnectableSendablePublisher<Upstream: Publisher>: Publisher where Upstream.Output: Sendable {
   public typealias Output = Upstream.Output
   public typealias Failure = Upstream.Failure
-  
+
   @usableFromInline
   internal let _connectable: Publishers.MakeConnectable<Upstream>
-  
+
   @export(implementation)
   internal init(sendablePublisher_: SendableShell<Upstream>) {
-    self._connectable = Publishers.MakeConnectable(upstream: sendablePublisher_._base)
+    _connectable = Publishers.MakeConnectable(upstream: sendablePublisher_._base)
   }
-  
+
   @export(implementation)
-  public func receive<S>(subscriber: S) where S: Subscriber, Failure == S.Failure, Output == S.Input {
+  public func receive<S: Subscriber>(subscriber: S) where Failure == S.Failure, Output == S.Input {
     _connectable.receive(subscriber: subscriber)
   }
-  
+
   @export(implementation)
   public func connect() -> any Cancellable {
     _connectable.connect()

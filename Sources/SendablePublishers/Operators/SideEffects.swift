@@ -12,7 +12,7 @@ extension SendableShell {
     receiveOutput: (@Sendable (Output) -> Void)? = nil,
     receiveCompletion: (@Sendable (Subscribers.Completion<Failure>) -> Void)? = nil,
     receiveCancel: (@Sendable () -> Void)? = nil,
-    receiveRequest: (@Sendable (Subscribers.Demand) -> Void)? = nil
+    receiveRequest: (@Sendable (Subscribers.Demand) -> Void)? = nil,
   ) -> SendableShell<Publishers.HandleEvents<Upstream>> {
     let handled = Publishers.HandleEvents(upstream: self._base,
                                           receiveSubscription: receiveSubscription,
@@ -45,11 +45,11 @@ extension SendableShell {
                                      on object: Root) -> AnyCancellable where Failure == Never {
     _base.assign(to: keyPath, on: object)
   }
-  
+
   @export(implementation)
   public func print(
     _ prefix: String = "",
-    to stream: (any TextOutputStream)? = nil
+    to stream: (any TextOutputStream)? = nil,
   ) -> SendableShell<Publishers.Print<Upstream>> {
     let printed = Publishers.Print(upstream: self._base, prefix: prefix, to: stream)
     return SendableShell<Publishers.Print<Upstream>>(_unverified_SendablePublisher__: printed)
