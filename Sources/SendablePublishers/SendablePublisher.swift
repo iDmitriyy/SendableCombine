@@ -25,6 +25,7 @@ public struct SendablePublisher_<Upstream: Publisher>: Publisher, @unchecked Sen
     _base = publisher
   }
   
+  @export(implementation)
   public func receive<S>(subscriber: S) where S: Subscriber, Failure == S.Failure, Output == S.Input {
     _base.receive(subscriber: subscriber)
   }
