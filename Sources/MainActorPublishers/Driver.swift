@@ -5,14 +5,9 @@
 //  Created by Dmitriy Ignatyev on 07.08.2026.
 //
 
-
 public import Combine
 import Foundation
 
-/// A type-erased publisher that never completes with an error.
-///
-/// `Driver` is a publisher optimized for UI bindings.
-/// Values are delivered on the `MainActor`, no error events, no completion events.
 public struct Driver<Element>: Publisher {
   public typealias Output = Element
   public typealias Failure = Never
