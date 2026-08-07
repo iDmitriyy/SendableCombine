@@ -53,17 +53,17 @@ private final class ResumptionGate: @unchecked Sendable {
 }
 
 public final class OSUnfairLock<State>: @unchecked Sendable {
-  let lock: OSAllocatedUnfairLock<State>
+  private let lock: OSAllocatedUnfairLock<State>
 
   public init(uncheckedState initialState: State) {
     lock = OSAllocatedUnfairLock(uncheckedState: initialState)
   }
 
-  public func withLockUnchecked<R>(_ body: (inout State) throws -> R) rethrows -> R {
+  public final func withLockUnchecked<R>(_ body: (inout State) throws -> R) rethrows -> R {
     try lock.withLockUnchecked(body)
   }
 
-  public func withLock<R: Sendable>(_ body: @Sendable (inout State) throws -> R) rethrows -> R {
+  public final func withLock<R: Sendable>(_ body: @Sendable (inout State) throws -> R) rethrows -> R {
     try lock.withLock(body)
   }
 }
@@ -90,7 +90,7 @@ func collectValues<P: Publisher & Sendable, T: Sendable>(
 //      print("____ withCheckedThrowingContinuation", Date())
       _debugPrintDate(prefix: "____ withCheckedThrowingContinuation")
       _debugPrintDate(prefix: "____ will make publisher.sink")
-      let canc = publisher.sink { [weak testState] value in
+      let cancellableInstance = publisher.sink { [weak testState] value in
 //            print("____ sink", Date())
         _debugPrintDate(prefix: "____ sink emited " + String(describing: value))
         guard let testState else {
@@ -109,7 +109,7 @@ func collectValues<P: Publisher & Sendable, T: Sendable>(
       }
       
       testState.withLockUnchecked { state in
-        state.cancellable = canc
+        state.cancellable = cancellableInstance
       }
       _debugPrintDate(prefix: "____ cancellable retained")
       
@@ -155,8 +155,8 @@ struct DriverTests {
       let infallible = subject.handleEvents(receiveSubscription: { _ in subscriptionCount += 1 })
       let driver = infallible.asDriver(initialValue: 0)
 
-      let task1 = collectValues(publisher: driver, expectedCount: 3, timeout: .seconds(1))
-      let task2 = collectValues(publisher: driver, expectedCount: 3, timeout: .seconds(1))
+      let task1 = collectValues(publisher: driver, expectedCount: 3, timeout: .milliseconds(10))
+      let task2 = collectValues(publisher: driver, expectedCount: 3, timeout: .milliseconds(10))
       
       subject.send(1)
       subject.send(2)

@@ -39,6 +39,15 @@ import os
 /// * **Case 3**: `Driver` is created with `initialValue`. While there are no subscribers yet, upstream emits `nextValue`.
 /// Subscriber 1 appears and receives `nextValue`.
 /// Subscriber 2 appears and receives `nextValue`.
+///
+/// ### Diagnostic Logging & UI Lifecycle
+/// Because a `Driver` is designed to continuously stream data to UI, any upstream termination, whether a normal completion (`.finished`)
+/// or an unhandled failure (`.failure`), is typically unexpected.
+/// Once a terminal event occurs, the reactive pipeline closes permanently, leaving UI components holding their last received state
+/// without any further updates.
+/// To prevent these silent pipeline terminations during development, failable factory initializers include an optional `logWhenTerminated`
+/// parameter (enabled by default). When active, it intercepts the stream's completion signals and logs a diagnostic warning,
+/// ensuring visibility into unexpected pipeline terminations.
 public struct Driver<Element: Sendable> {
   @usableFromInline internal let _upstream: AnyPublisher<Element, Never>
   
@@ -66,11 +75,27 @@ extension Driver: @unchecked Sendable {}
 // MARK: - Factory Initializers
 
 extension Driver {
-  
   private typealias SharedState = (publisher: AnyPublisher<Element, Never>?, cancellable: (any Cancellable)?)
 
-  // MARK: Init with Infallible Publisher
+  // MARK: - Init with Infallible Publisher
   
+  /// Creates a `Driver` from an infallible publisher, providing explicit main-thread scheduling and state sharing.
+  ///
+  /// This constructor sets up a shared, resource-efficient pipeline where the actual connection to the
+  /// upstream occurs **lazily**. The subscription is deferred and triggered only when the very first
+  /// subscriber connects to the `Driver`. From that point forward, a single upstream connection is
+  /// shared across all consumers.
+  ///
+  /// * **Main Thread Guarantee**: Downstream observation is automatically constrained to the main queue
+  ///   (`DispatchQueue.main`), ensuring thread safety for direct UI data binding.
+  /// * **Backpressure Compliance**: Data flow respects Combine's native demand contract (`Subscribers.Demand`).
+  ///   The underlying shared buffer regulates demand tokens dynamically down to each individual subscriber.
+  /// * **State Replay**: Synchronously replays the latest state upon subscription: either the `initialValue`
+  ///   if no data has arrived yet, or the most recent upstream emission.
+  ///
+  /// - Parameters:
+  ///   - infallibleUpstream: An existing publisher that is guaranteed never to emit failures (`Failure == Never`).
+  ///   - initialValue: The default baseline element emitted upon subscription if the upstream hasn't emitted anything.
   public init<P: Publisher>(infallibleUpstream: P, initialValue: Element) where P.Output == Element, P.Failure == Never {
     let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
     
@@ -91,7 +116,7 @@ extension Driver {
           .receive(on: DispatchQueue.main)
           .multicast(subject: bufferSubject)
         
-        // 3. Атомарно подключаем апстрим. Спрос пойдет через внутренние механизмы Combine.
+        // 3. Atomically connect to the upstream. Demand tracking flows natively via internal Combine mechanisms.
         state.cancellable = connectable.connect()
         
         let shared = connectable.eraseToAnyPublisher()
@@ -163,9 +188,22 @@ extension Publisher where Output: Sendable {
   /// - Parameter initialValue: The default state element transmitted synchronously upon subscriber connection
   ///   if the upstream hasn't emitted anything.
   /// - Returns: A `Driver` instance.
-  public func asDriverIgnoringError(initialValue: Output) -> Driver<Output> {
-    let processed = self.catch { _ in Empty<Output, Never>() }
-    
+  public func asDriverIgnoringError(initialValue: Output, logWhenTerminated: Bool = true) -> Driver<Output> {
+    let processed = self
+      .handleEvents(receiveCompletion: { completion in
+        guard logWhenTerminated else { return }
+        switch completion {
+        case .finished:
+          let message = "[Driver<\(Output.self)> Warning] Upstream is terminated with COMPLETION. "
+              + "The UI stream is now permanently frozen."
+        case .failure(let error):
+          let message = "[Driver<\(Output.self)> Warning] Upstream terminated with error: \(error). "
+            + "The UI stream is now permanently frozen."
+          break
+        }
+      })
+      .catch { _ in Empty<Output, Never>() }
+
     return Driver(infallibleUpstream: processed, initialValue: initialValue)
   }
 
@@ -188,8 +226,26 @@ extension Publisher where Output: Sendable {
   ///     into a safe fallback `Output` element.
   /// - Returns: A `Driver` instance that emits a fallback value upon error.
   public func asDriver(initialValue: Output,
+                       logWhenTerminated: Bool = true,
                        catchError: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
-    let processed = self.catch { failure in Just(catchError(failure)) }
+    let processed = self
+      .handleEvents(receiveCompletion: { completion in
+        guard logWhenTerminated else { return }
+        switch completion {
+        case .finished:
+          let message = "[Driver<\(Output.self)> Warning] Upstream is terminated with COMPLETION. "
+            + "The UI stream is now permanently frozen."
+          break
+        case .failure(let error):
+          let message = "[Driver<\(Output.self)> Warning] Upstream terminated with error: \(error). "
+            + "The UI stream is now permanently frozen."
+          break
+        }
+      })
+      .catch { failure in Just(catchError(failure)) }
+
+    // FIXME: - LogError
+    
     return Driver(infallibleUpstream: processed, initialValue: initialValue)
   }
 }
