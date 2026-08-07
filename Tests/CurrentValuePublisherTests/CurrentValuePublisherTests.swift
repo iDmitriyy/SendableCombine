@@ -2,14 +2,47 @@ import Testing
 import CurrentValuePublisher
 import Combine
 
-@Suite("CurrentValuePublisher")
-struct CurrentValuePublisherTests {
+@Suite("AnyCurrentValuePublisher")
+struct AnyCurrentValuePublisherTests {
   @Test("Emits value on subscription")
-  func emitsOnSubscribe() {
-    let sut = CurrentValuePublisher<Int, Never>(initialValue: 42)
-    var received: [Int] = []
-    let cancellable = sut.sink { value in received.append(value) }
+  func emitsOnSubscribe() async {
+    let subject = CurrentValueSubject<Int, Never>(42)
+    let publisher = AnyCurrentValuePublisher(subject)
+
+    let received = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
+      var values = [Int]()
+      var cancellable: AnyCancellable?
+      cancellable = publisher.sink { value in
+        values.append(value)
+        if values.count >= 1 {
+          continuation.resume(returning: values)
+        }
+      }
+      _ = cancellable
+    }
+
     #expect(received == [42])
-    cancellable.cancel()
+  }
+
+  @Test("Receives subsequent values after subscription")
+  func receivesSubsequentValues() async {
+    let subject = CurrentValueSubject<Int, Never>(42)
+    let publisher = AnyCurrentValuePublisher(subject)
+
+    let received = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
+      var values = [Int]()
+      var cancellable: AnyCancellable?
+      cancellable = publisher.sink { value in
+        values.append(value)
+        if values.count >= 2 {
+          continuation.resume(returning: values)
+        }
+      }
+      _ = cancellable
+    }
+
+    subject.send(100)
+
+    #expect(received == [42, 100])
   }
 }
