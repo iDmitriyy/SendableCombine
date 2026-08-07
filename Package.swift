@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "SendableCombine",
-  platforms: [.macOS(.v12), .iOS(.v15), .tvOS(.v15), .macCatalyst(.v15), .watchOS(.v9), .visionOS(.v1)],
+  platforms: [.macOS(.v15), .iOS(.v18), .tvOS(.v18), .macCatalyst(.v18), .watchOS(.v11), .visionOS(.v2)],
   products: [
     .library(name: "SendableCombine", targets: ["SendableCombine"]),
     .library(name: "SendablePublishers", targets: ["SendablePublishers"]),
