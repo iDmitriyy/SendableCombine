@@ -119,6 +119,8 @@ public struct CancellationBag: ~Copyable, Sendable {
 
 **AsyncAlgorithms interop.** A Sendable-clean bridge to [swift-async-algorithms](https://github.com/apple/swift-async-algorithms): feed a `SendablePublisher`'s output into its channels and buffers, and consume async sequences as `Sendable` publishers – so Combine's operators and AsyncAlgorithms' algorithms compose instead of competing.
 
+**OpenCombine Integration.** 
+
 The operator surface continues to track Combine's.
 
 Considered, not committed: published build-time and binary-size benchmarks.

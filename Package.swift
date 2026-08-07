@@ -1,23 +1,43 @@
 // swift-tools-version: 6.3
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-  name: "SendablePublishers",
+  name: "SendableCombine",
   platforms: [.macOS(.v12), .iOS(.v15), .tvOS(.v15), .macCatalyst(.v15), .watchOS(.v9), .visionOS(.v1)],
   products: [
+    .library(name: "SendableCombine", targets: ["SendableCombine"]),
     .library(name: "SendablePublishers", targets: ["SendablePublishers"]),
+    .library(name: "MainActorPublishers", targets: ["MainActorPublishers"]),
+    .library(name: "CurrentValuePublisher", targets: ["CurrentValuePublisher"]),
+    .library(name: "CancellationBag", targets: ["CancellationBag"]),
   ],
   targets: [
-    .target(name: "SendablePublishers", swiftSettings: [
-      .enableUpcomingFeature("ApproachableConcurrency"),
+    .target(name: "SendablePublishers"),
+    .target(name: "CancellationBag", swiftSettings: [
+      .enableExperimentalFeature("StaticExclusiveOnly"),
     ]),
+    .target(name: "CurrentValuePublisher",
+            dependencies: ["SendablePublishers"]),
+    .target(name: "MainActorPublishers",
+            dependencies: ["SendablePublishers"]),
+    .target(name: "SendableCombine",
+            dependencies: [
+              "SendablePublishers",
+              "CancellationBag",
+              "CurrentValuePublisher",
+              "MainActorPublishers",
+            ]),
     .testTarget(name: "SendablePublishersTests",
-                dependencies: ["SendablePublishers"],
-                swiftSettings: [
-                  .enableUpcomingFeature("ApproachableConcurrency"),
-                ]),
+                dependencies: ["SendablePublishers"]),
+    .testTarget(name: "CancellationBagTests",
+                dependencies: ["CancellationBag"]),
+    .testTarget(name: "CurrentValuePublisherTests",
+                dependencies: ["CurrentValuePublisher"]),
+    .testTarget(name: "MainActorPublishersTests",
+                dependencies: ["MainActorPublishers"]),
+    .testTarget(name: "SendableCombineTests",
+                dependencies: ["SendableCombine"]),
   ],
   swiftLanguageModes: [.v6],
 )
@@ -28,6 +48,7 @@ for target: PackageDescription.Target in package.targets {
     settings.append(.enableUpcomingFeature("ExistentialAny"))
     settings.append(.enableUpcomingFeature("InternalImportsByDefault"))
     settings.append(.enableUpcomingFeature("MemberImportVisibility"))
+    settings.append(.enableUpcomingFeature("ApproachableConcurrency"))
     
     $0 = settings
   }(&target.swiftSettings)
