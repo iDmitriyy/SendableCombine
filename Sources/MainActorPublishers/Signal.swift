@@ -11,10 +11,10 @@ import SendableCombineLogging
 
 // MARK: - Core Signal Type
 
-/// A shared, error-free publisher optimized for *ephemeral UI events*.
+/// A shared, error-free publisher optimized for *UI events*.
 ///
 /// `Signal` represents an infallible stream of elements designed for transient UI events —
-/// user actions, scroll **didScroll** notifications, navigation decisions. Like `Driver`, it
+/// user actions, notifications, navigation decisions. Like `Driver`, it
 /// guarantees that values are observed on the main thread and shares a single upstream
 /// connection among all active subscribers.
 ///
@@ -54,18 +54,53 @@ import SendableCombineLogging
 /// receive `.finished` immediately. To prevent these silent pipeline terminations during
 /// development, every factory initializer / conversion includes an optional `logWhenTerminated`
 /// parameter (enabled by default) that logs a diagnostic warning via `SendableCombineLogging`.
-public struct Signal<Element>: Publisher {
+public struct Signal<Element: Sendable>: Publisher {
+  @usableFromInline internal let _upstream: AnyPublisher<Element, Never>
+}
+
+// MARK: - Sendable
+
+extension Signal: @unchecked Sendable where Element: Sendable {}
+
+// MARK: - Publisher Conformance
+
+extension Signal {
   public typealias Output = Element
   public typealias Failure = Never
-
-  @usableFromInline internal let _upstream: AnyPublisher<Element, Never>
-
+  
   public func receive<S: Subscriber>(subscriber: S) where S.Failure == Never, S.Input == Element {
     _upstream.receive(subscriber: subscriber)
   }
+}
 
-  // MARK: - Init with Infallible Publisher
+// MARK: - MainActor observation
 
+extension Signal where Element: Sendable {
+  /// Subscribes a `@MainActor`-isolated receive closure.
+  ///
+  /// The Signal guarantees every element is delivered on the main thread (via `receive(on:)`).
+  /// This method bridges that runtime guarantee into the compiler with `MainActor.assumeIsolated`,
+  /// which traps only if the closure ever ran off the main thread.
+  public func emit(receiveValue: @MainActor @Sendable @escaping (Self.Output) -> Void) -> AnyCancellable {
+    _upstream.sink(receiveValue: { value in
+      MainActor.assumeIsolated {
+        receiveValue(value)
+      }
+    })
+  }
+}
+
+// MARK: - as Publisher
+
+extension Signal {
+  public func asPublisher() -> AnyPublisher<Element, Never> {
+    _upstream
+  }
+}
+
+// MARK: - Common initializer
+
+extension Signal {
   /// Creates a `Signal` from an infallible publisher, providing main-thread scheduling and
   /// subscriber-count-driven ("while connected") state sharing.
   ///
@@ -112,19 +147,19 @@ public struct Signal<Element>: Publisher {
   /// - Parameters:
   ///   - failableUpstream: An arbitrary publisher whose `Output` matches this `Signal`'s.
   ///   - logWhenTerminated: When `true` (default), logs a diagnostic warning on termination.
-  public init<P: Publisher>(failableUpstream: P,
-                            logWhenTerminated: Bool = true) where P.Output == Element {
-    _upstream = failableUpstream
-      .handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   publisherName: "Signal<\(Output.self)>",
-                                   completion: completion)
-      })
-      .catch { _ in Empty<Element, Never>() }
-      .receive(on: DispatchQueue.main)
-      .share()
-      .eraseToAnyPublisher()
-  }
+//  public init<P: Publisher>(failableUpstream: P,
+//                            logWhenTerminated: Bool = true) where P.Output == Element {
+//    _upstream = failableUpstream
+//      .handleEvents(receiveCompletion: { completion in
+//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+//                                   publisherName: "Signal<\(Output.self)>",
+//                                   completion: completion)
+//      })
+//      .catch { _ in Empty<Element, Never>() }
+//      .receive(on: DispatchQueue.main)
+//      .share()
+//      .eraseToAnyPublisher()
+//  }
 
   // MARK: - Init with Failable Publisher + Recovery
 
@@ -139,58 +174,29 @@ public struct Signal<Element>: Publisher {
   ///   - catchError: A `@Sendable` closure invoked to transform an upstream `Failure` into a
   ///     safe fallback `Output` element.
   ///   - logWhenTerminated: When `true` (default), logs a diagnostic warning on termination.
-  public init<P: Publisher>(failableUpstream: P,
-                            catchError: @Sendable @escaping () -> Output,
-                            logWhenTerminated: Bool = true) where P.Output == Element {
-    _upstream = failableUpstream
-      .handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   publisherName: "Signal<\(Output.self)>",
-                                   completion: completion)
-      })
-      .catch { _ in Just(catchError()) }
-      .receive(on: DispatchQueue.main)
-      .share()
-      .eraseToAnyPublisher()
-  }
+//  public init<P: Publisher>(failableUpstream: P,
+//                            catchError: @Sendable @escaping () -> Output,
+//                            logWhenTerminated: Bool = true) where P.Output == Element {
+//    _upstream = failableUpstream
+//      .handleEvents(receiveCompletion: { completion in
+//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+//                                   publisherName: "Signal<\(Output.self)>",
+//                                   completion: completion)
+//      })
+//      .catch { _ in Just(catchError()) }
+//      .receive(on: DispatchQueue.main)
+//      .share()
+//      .eraseToAnyPublisher()
+//  }
 }
 
-// MARK: - Sendable
+// MARK: - Publisher as Signal (Infallible)
 
-extension Signal: @unchecked Sendable where Element: Sendable {}
-
-extension Signal where Element: Sendable {
-  /// Subscribes a `@MainActor`-isolated receive closure.
-  ///
-  /// The Signal guarantees every element is delivered on the main thread (via `receive(on:)`).
-  /// This method bridges that runtime guarantee into the compiler with `MainActor.assumeIsolated`,
-  /// which traps only if the closure ever ran off the main thread.
-  public func drive(receiveValue: @MainActor @Sendable @escaping (Self.Output) -> Void) -> AnyCancellable {
-    _upstream.sink(receiveValue: { value in
-      MainActor.assumeIsolated {
-        receiveValue(value)
-      }
-    })
-  }
-}
-
-// MARK: - Signal as Publisher
-
-extension Signal {
-  /// Unwraps the underlying `AnyPublisher<Element, Never>` that drives this shared event stream.
-  public func asPublisher() -> AnyPublisher<Element, Never> {
-    _upstream
-  }
-}
-
-// MARK: - Publisher as Signal
-
-extension Publisher where Failure == Never {
+extension Publisher where Failure == Never, Output: Sendable {
   /// Transforms an infallible publisher into a `Signal`.
   ///
-  /// Use this operator when your upstream data source is guaranteed never to fail and is
-  /// intended for ephemeral UI events. The resulting `Signal` is shared among subscribers and
-  /// carries no replay buffer.
+  /// Use this operator when upstream is guaranteed never to fail and is
+  /// intended for UI events. The resulting `Signal` is shared among subscribers.
   ///
   /// - Parameter logWhenTerminated: When `true` (default), logs upstream termination as a
   ///   diagnostic warning.
@@ -199,20 +205,31 @@ extension Publisher where Failure == Never {
   }
 }
 
-extension Publisher {
+// MARK: - Publisher as Signal (Failable)
+
+extension Publisher where Output: Sendable {
   /// Transforms a failable publisher into a `Signal`, dropping any generated errors silently.
-  ///
-  /// Use this operator for non-critical UI events where an error should simply close the
-  /// stream without disrupting the UI. Termination is logged by default (`logWhenTerminated`).
   public func asSignalIgnoringError(logWhenTerminated: Bool = true) -> Signal<Output> {
-    Signal(failableUpstream: self, logWhenTerminated: logWhenTerminated)
+    let processed = handleEvents(receiveCompletion: { completion in
+      _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                 publisherName: "Signal<\(Output.self)>",
+                                 completion: completion)
+    })
+    .catch { _ in Empty<Output, Never>() }
+    
+    return Signal(infallibleUpstream: processed, logWhenTerminated: false)
   }
 
   /// Transforms a failable publisher into a `Signal`, recovering from errors with a fallback event.
-  ///
-  /// - Parameter catchError: A `@Sendable` closure invoked to produce a safe fallback `Output`.
   public func asSignal(catchError: @Sendable @escaping () -> Output,
                        logWhenTerminated: Bool = true) -> Signal<Output> {
-    Signal(failableUpstream: self, catchError: catchError, logWhenTerminated: logWhenTerminated)
+    let processed = handleEvents(receiveCompletion: { completion in
+      _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                 publisherName: "Signal<\(Output.self)>",
+                                 completion: completion)
+    })
+    .catch { _ in Just(catchError()) }
+    
+    return Signal(infallibleUpstream: processed, logWhenTerminated: false)
   }
 }
