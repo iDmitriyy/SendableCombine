@@ -317,8 +317,7 @@ extension CancellationBag {
 
     // deinit {} // Tasks are cancelled by `CancellationBag` in its deinit
 
-    fileprivate final func __setDisposed_AndConsumeStorage_withLock()
-      -> sending Set<AnyCancellableObj> {
+    fileprivate final func __setDisposed_AndConsumeStorage_withLock() -> sending Set<AnyCancellableObj> {
       __storage.withLockUnchecked { storage in
         storage.isDisposed = true
         let tasksToCancel = storage.tasks
