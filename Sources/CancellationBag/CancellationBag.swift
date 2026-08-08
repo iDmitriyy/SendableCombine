@@ -451,6 +451,7 @@ extension CancellationBag.__TaskCancellationBag {
 fileprivate typealias OrderedSet<Element> = ContiguousArray<Element>
 
 extension OrderedSet where Element: AnyObject {
+  @_transparent
   fileprivate mutating func insert(_ element: Element) {
     let notContained = allSatisfy { $0 !== element }
     guard notContained else { return }
@@ -461,7 +462,7 @@ extension OrderedSet where Element: AnyObject {
 }
 
 extension ContiguousArray {
-  @inlinable
+  @_transparent
   internal func _forEach_UsingSpan_(_ body: (Element) -> Void) {
     let span = self.span
     let count = span.count
