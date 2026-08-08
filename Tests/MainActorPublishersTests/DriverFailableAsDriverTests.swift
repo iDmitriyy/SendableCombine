@@ -3,6 +3,7 @@ import Testing
 @testable import SendableCombineLogging
 import Combine
 import Foundation
+import Synchronization
 
 // MARK: - Test Error
 
@@ -10,18 +11,23 @@ private struct FailableError: Error {}
 
 // MARK: - Log Capture
 
-private final class LogRecordCollector: @unchecked Sendable {
-  private let lock = NSLock()
-  private var records: [SendableCombineLogEntry] = []
+private final class LogRecordCollector: Sendable {
+  private let lock = Mutex<[SendableCombineLogEntry]>([])
 
   func append(_ payload: (level: SendableCombineLogLevel, entry: SendableCombineLogEntry)) {
-    lock.lock(); defer { lock.unlock() }
-    records.append(payload.entry)
+    lock.withLock { records in
+      records.append(payload.entry)
+    }
   }
 
   func entries() -> [SendableCombineLogEntry] {
-    lock.lock(); defer { lock.unlock() }
-    return records
+    lock.withLock { records in
+      records
+    }
+  }
+
+  func makeClosureObserver() -> SendableCombineLoggingObserver {
+    { [self] payload in self.append(payload) }
   }
 }
 
@@ -35,9 +41,7 @@ struct FailableDriverMethodsTests {
 
     SendableCombineLogging._resetObserverForTesting()
     let collector = LogRecordCollector()
-    SendableCombineLogging.injectOnce { payload in
-      collector.append(payload)
-    }
+    SendableCombineLogging.injectOnce(loggingObserver: collector.makeClosureObserver())
 
     let subject = PassthroughSubject<Int, FailableError>()
     let driver = subject.asDriver(initialValue: 0, catchError: { _ in -1 })
@@ -61,9 +65,7 @@ struct FailableDriverMethodsTests {
 
     SendableCombineLogging._resetObserverForTesting()
     let collector = LogRecordCollector()
-    SendableCombineLogging.injectOnce { payloadSample in
-      collector.append(payloadSample)
-    }
+    SendableCombineLogging.injectOnce(loggingObserver: collector.makeClosureObserver())
 
     let subject = PassthroughSubject<Int, FailableError>()
     let driver = subject.asDriverIgnoringError(initialValue: 0)

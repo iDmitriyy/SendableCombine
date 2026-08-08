@@ -93,6 +93,8 @@ func collectValues<P: Publisher & Sendable, T: Sendable>(
       let cancellableInstance = publisher.sink { [weak testState] value in
 //            print("____ sink", Date())
         _debugPrintDate(prefix: "____ sink emited " + String(describing: value))
+        #expect(Thread.isMainThread)
+        MainActor.assumeIsolated { }
         guard let testState else {
           Issue.record("Unexpected nil testState")
           return
@@ -191,6 +193,27 @@ struct DriverTests {
       let results = try await task.value
       _debugPrintDate(prefix: "____ awaited results")
       #expect(results == [0, 2, 3])
+    }
+  }
+
+  // MARK: - MainActor Drive
+
+  @Suite("testDrive_MainActor")
+  struct DriveMainActor {
+    @Test("drive(receiveValue:) delivers all values on the main thread without crashing in assumeIsolated")
+    func driveDeliversOnMainThread() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(500))
+
+      subject.send(1)
+
+      let values = try await task.value
+
+      #expect(values == [0, 1])
     }
   }
 

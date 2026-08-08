@@ -73,6 +73,24 @@ extension Driver: Publisher {
 
 extension Driver: @unchecked Sendable {}
 
+// MARK: - MainActor Drive
+
+extension Driver {
+  /// Subscribes a `@MainActor`-isolated receive closure.
+  ///
+  /// The Driver guarantees every value — both upstream emissions and the replayed `initialValue` —
+  /// is delivered on the main thread, because the pipeline re-schedules on `DispatchQueue.main`
+  /// downstream of its internal buffer. This method bridges that runtime guarantee into the compiler
+  /// with `MainActor.assumeIsolated`, which traps only if the closure ever ran off the main thread.
+  public func drive(receiveValue: @MainActor @Sendable @escaping (Element) -> Void) -> AnyCancellable {
+    _upstream.sink(receiveValue: { value in
+      MainActor.assumeIsolated {
+        receiveValue(value)
+      }
+    })
+  }
+}
+
 // MARK: - Factory Initializers
 
 extension Driver {
@@ -120,14 +138,21 @@ extension Driver {
           .handleEvents(receiveCompletion: { completion in
             Self.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
           })
-          .receive(on: DispatchQueue.main)
           .multicast(subject: bufferSubject)
         
         // 3. Atomically connect to the upstream. Demand tracking flows natively via internal Combine mechanisms.
         state.cancellable = connectable.connect()
         
-        let shared = connectable.eraseToAnyPublisher()
+        /// 4. Re-schedule the shared stream onto the main queue **downstream** of the buffer.
+        /// Placing `receive(on:)` here (instead of upstream of `multicast`) guarantees that the buffer's
+        /// synchronously replayed current value is also delivered on the main thread, no matter which
+        /// thread performed the subscription.
+        let shared = connectable
+          .receive(on: DispatchQueue.main)
+          .eraseToAnyPublisher()
+        
         state.publisher = shared
+        
         return shared
       }
     }
@@ -202,7 +227,6 @@ extension Driver {
               ))
             }
           })
-          .receive(on: DispatchQueue.main)
           .multicast(subject: bufferSubject)
 
         state.cancellable = connectable.connect()
@@ -213,6 +237,7 @@ extension Driver {
               signals.hasSubscriber = true
             }
           })
+          .receive(on: DispatchQueue.main)
           .eraseToAnyPublisher()
 
         state.publisher = shared
