@@ -132,62 +132,6 @@ extension Signal {
       .share()
       .eraseToAnyPublisher()
   }
-
-  // MARK: - Init with Failable Publisher
-
-  /// Creates a `Signal` from a failable publisher, silently dropping any generated errors.
-  ///
-  /// * **Error Swallowing**: If the upstream emits `.failure`, the error is dropped and the
-  ///   stream permanently completes (no further events are delivered).
-  /// * **Thread and Sharing Guarantees**: Shares a single main-thread connection and never
-  ///   replays elements.
-  /// * **Diagnostics**: Termination (`.finished` or `.failure`) is logged by default through
-  ///   `logWhenTerminated`.
-  ///
-  /// - Parameters:
-  ///   - failableUpstream: An arbitrary publisher whose `Output` matches this `Signal`'s.
-  ///   - logWhenTerminated: When `true` (default), logs a diagnostic warning on termination.
-//  public init<P: Publisher>(failableUpstream: P,
-//                            logWhenTerminated: Bool = true) where P.Output == Element {
-//    _upstream = failableUpstream
-//      .handleEvents(receiveCompletion: { completion in
-//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-//                                   publisherName: "Signal<\(Output.self)>",
-//                                   completion: completion)
-//      })
-//      .catch { _ in Empty<Element, Never>() }
-//      .receive(on: DispatchQueue.main)
-//      .share()
-//      .eraseToAnyPublisher()
-//  }
-
-  // MARK: - Init with Failable Publisher + Recovery
-
-  /// Creates a `Signal` from a failable publisher, recovering from errors with a fallback event.
-  ///
-  /// When the upstream emits an error, the `catchError` closure computes a fallback `Output`
-  /// that is forwarded downstream (so the UI receives an explicit "error event"), after which
-  /// the stream terminates permanently. Elements are **not** replayed to any new subscriber.
-  ///
-  /// - Parameters:
-  ///   - failableUpstream: An arbitrary publisher that may fail.
-  ///   - catchError: A `@Sendable` closure invoked to transform an upstream `Failure` into a
-  ///     safe fallback `Output` element.
-  ///   - logWhenTerminated: When `true` (default), logs a diagnostic warning on termination.
-//  public init<P: Publisher>(failableUpstream: P,
-//                            catchError: @Sendable @escaping () -> Output,
-//                            logWhenTerminated: Bool = true) where P.Output == Element {
-//    _upstream = failableUpstream
-//      .handleEvents(receiveCompletion: { completion in
-//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-//                                   publisherName: "Signal<\(Output.self)>",
-//                                   completion: completion)
-//      })
-//      .catch { _ in Just(catchError()) }
-//      .receive(on: DispatchQueue.main)
-//      .share()
-//      .eraseToAnyPublisher()
-//  }
 }
 
 // MARK: - Publisher as Signal (Infallible)
@@ -223,13 +167,20 @@ extension Publisher where Output: Sendable {
   /// Transforms a failable publisher into a `Signal`, recovering from errors with a fallback event.
   public func asSignal(catchError: @Sendable @escaping () -> Output,
                        logWhenTerminated: Bool = true) -> Signal<Output> {
-    let processed = handleEvents(receiveCompletion: { completion in
-      _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                 publisherName: "Signal<\(Output.self)>",
-                                 completion: completion)
-    })
-    .catch { _ in Just(catchError()) }
+    func makeSignal(failableSource: some Publisher<Output, Failure>) -> Signal<Output> {
+      let infallible = failableSource.catch { _ in Just(catchError()) }
+      return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
+    }
     
-    return Signal(infallibleUpstream: processed, logWhenTerminated: false)
+    if logWhenTerminated {
+      let withTerminationDiagnostic = self.handleEvents(receiveCompletion: { completion in
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                   publisherName: "Signal<\(Output.self)>",
+                                   completion: completion)
+      })
+      return makeSignal(failableSource: withTerminationDiagnostic)
+    } else {
+      return makeSignal(failableSource: self)
+    }
   }
 }
