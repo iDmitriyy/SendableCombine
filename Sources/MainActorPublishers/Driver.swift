@@ -136,7 +136,11 @@ extension Driver {
         /// This ensures the upstream is shared and subscribed to exactly ONCE (subscriptionCount == 1).
         let connectable = infallibleUpstream
           .handleEvents(receiveCompletion: { completion in
-            Self.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+            _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                       finishedCode: .driverUpstreamTerminatedWithCompletion,
+                                       failureCode: .driverUpstreamTerminatedWithFailure,
+                                       publisherName: "Driver<\(Output.self)>",
+                                       completion: completion)
           })
           .multicast(subject: bufferSubject)
         
@@ -267,7 +271,11 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
   public func asDriver() -> Driver<Output> {
     let upstream = self
       .handleEvents(receiveCompletion: { completion in
-        Driver<Output>.logTerminationDiagnostic(logWhenTerminated: true, completion: completion)
+        _logTerminationDiagnostic(logWhenTerminated: true,
+                                   finishedCode: .driverUpstreamTerminatedWithCompletion,
+                                   failureCode: .driverUpstreamTerminatedWithFailure,
+                                   publisherName: "Driver<\(Output.self)>",
+                                   completion: completion)
       })
       .receive(on: DispatchQueue.main)
       .eraseToAnyPublisher()
@@ -316,7 +324,11 @@ extension Publisher where Output: Sendable {
   public func asDriverIgnoringError(initialValue: Output, logWhenTerminated: Bool = true) -> Driver<Output> {
     let processed = self
       .handleEvents(receiveCompletion: { completion in
-        Driver<Output>.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                   finishedCode: .driverUpstreamTerminatedWithCompletion,
+                                   failureCode: .driverUpstreamTerminatedWithFailure,
+                                  publisherName: "Driver<\(Output.self)>",
+                                   completion: completion)
       })
       .catch { _ in Empty<Output, Never>() }
 
@@ -346,35 +358,14 @@ extension Publisher where Output: Sendable {
                        catchError: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
     let processed = self
       .handleEvents(receiveCompletion: { completion in
-        Driver<Output>.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                   finishedCode: .driverUpstreamTerminatedWithCompletion,
+                                   failureCode: .driverUpstreamTerminatedWithFailure,
+                                   publisherName: "Driver<\(Output.self)>",
+                                   completion: completion)
       })
       .catch { failure in Just(catchError(failure)) }
     
     return Driver(infallibleUpstream: processed, initialValue: initialValue, logWhenTerminated: false)
-  }
-}
-
-// MARK: - Termination Diagnostic
-
-extension Driver {
-  /// Logs a diagnostic warning when the upstream terminates, so a silent pipeline termination
-  /// (which permanently freezes the UI stream) stays visible during development.
-  ///
-  /// - Parameters:
-  ///   - logWhenTerminated: When `true`, logs the warning; when `false`, does nothing.
-  ///   - completion: The terminal event received from the upstream.
-  @inline(never)
-  fileprivate static func logTerminationDiagnostic<Failure: Error>(
-    logWhenTerminated: Bool,
-    completion: Subscribers.Completion<Failure>
-  ) {
-    guard logWhenTerminated else { return }
-    switch completion {
-    case .finished:
-      _log(.warning, SendableCombineLogEntry(code: .driverUpstreamTerminatedWithCompletion,
-                                             message: "The upstream is terminated with COMPLETION. The UI stream is now permanently frozen."))
-    case .failure(let error):
-      _log(.warning, SendableCombineLogEntry(code: .driverUpstreamTerminatedWithFailure, message: "The upstream terminated with error: \(error). The UI stream is now permanently frozen."))
-    }
   }
 }

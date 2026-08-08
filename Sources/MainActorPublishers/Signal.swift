@@ -89,7 +89,11 @@ public struct Signal<Element>: Publisher {
                             logWhenTerminated: Bool = true) where P.Output == Element, P.Failure == Never {
     _upstream = infallibleUpstream
       .handleEvents(receiveCompletion: { completion in
-        Self.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                   finishedCode: .signalUpstreamTerminatedWithCompletion,
+                                   failureCode: .signalUpstreamTerminatedWithFailure,
+                                   publisherName: "Signal<\(Output.self)>",
+                                   completion: completion)
       })
       .receive(on: DispatchQueue.main)
       .share()
@@ -114,7 +118,11 @@ public struct Signal<Element>: Publisher {
                             logWhenTerminated: Bool = true) where P.Output == Element {
     _upstream = failableUpstream
       .handleEvents(receiveCompletion: { completion in
-        Self.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                   finishedCode: .signalUpstreamTerminatedWithCompletion,
+                                   failureCode: .signalUpstreamTerminatedWithFailure,
+                                   publisherName: "Signal<\(Output.self)>",
+                                   completion: completion)
       })
       .catch { _ in Empty<Element, Never>() }
       .receive(on: DispatchQueue.main)
@@ -140,36 +148,16 @@ public struct Signal<Element>: Publisher {
                             logWhenTerminated: Bool = true) where P.Output == Element {
     _upstream = failableUpstream
       .handleEvents(receiveCompletion: { completion in
-        Self.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                   finishedCode: .signalUpstreamTerminatedWithCompletion,
+                                   failureCode: .signalUpstreamTerminatedWithFailure,
+                                   publisherName: "Signal<\(Output.self)>",
+                                   completion: completion)
       })
       .catch { _ in Just(catchError()) }
       .receive(on: DispatchQueue.main)
       .share()
       .eraseToAnyPublisher()
-  }
-}
-
-// MARK: - Termination Diagnostic
-
-extension Signal {
-  /// Logs a diagnostic warning when the upstream terminates, so a silent pipeline termination
-  /// (which permanently closes the shared event stream) stays visible during development.
-  ///
-  /// - Parameters:
-  ///   - logWhenTerminated: When `true`, logs the warning; when `false`, does nothing.
-  ///   - completion: The terminal event received from the upstream.
-  @inline(never)
-  fileprivate static func logTerminationDiagnostic<Failure: Error>(logWhenTerminated: Bool,
-                                                                   completion: Subscribers.Completion<Failure>) {
-    guard logWhenTerminated else { return }
-    switch completion {
-    case .finished:
-      _log(.warning, SendableCombineLogEntry(code: .signalUpstreamTerminatedWithCompletion,
-                                             message: "The Signal upstream terminated with COMPLETION. The shared event stream is now permanently closed - no further events will be delivered."))
-    case .failure(let error):
-      _log(.warning, SendableCombineLogEntry(code: .signalUpstreamTerminatedWithFailure,
-                                             message: "The Signal upstream terminated with error: \(error). The shared event stream is now permanently closed - no further events will be delivered."))
-    }
   }
 }
 
