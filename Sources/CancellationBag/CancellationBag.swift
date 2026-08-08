@@ -202,10 +202,26 @@ public struct CancellationBag: ~Copyable, Sendable {
       if storage.isDisposed {
         return existential
       } else {
+        if storage.cancellableExistentials.contains(where: { _isSameInstance($0, existential) }) {
+          return nil // Already stored; do not store and do not cancel
+        }
         storage.cancellableExistentials.append(existential)
         return nil
       }
     }
+  }
+
+  /// Returns `true` when both existentials wrap the *same* class instance.
+  ///
+  /// Value-typed `Cancellable`s have no stable identity, so they are always
+  /// treated as distinct — mirroring how `AnyCancellable` dedup relies on its
+  /// value semantics, this keeps repeat inserts of one class instance from
+  /// being stored (and later cancelled) more than once.
+  private func _isSameInstance(_ a: any Cancellable, _ b: any Cancellable) -> Bool {
+    if let a = a as? any AnyObject, let b = b as? any AnyObject {
+      return a === b
+    }
+    return false
   }
 
   // MARK: - Insert multiple Cancellables
@@ -231,10 +247,10 @@ public struct CancellationBag: ~Copyable, Sendable {
   }
   
   private func __insert_withLock(_ cancellables: some Collection<any Cancellable>) {
+    // Split AnyCancellable vs other existentials
     var cancellableObjects: [AnyCancellable] = []
     var cancellableExistentials: [any Cancellable] = []
 
-    // Split AnyCancellable vs other existentials
     for cancellable in cancellables {
       if let anyCancellableObject = cancellable as? AnyCancellable {
         cancellableObjects.append(anyCancellableObject)
@@ -247,7 +263,13 @@ public struct CancellationBag: ~Copyable, Sendable {
       if storage.isDisposed {
         return cancellableExistentials
       } else {
-        storage.cancellableExistentials += cancellableExistentials
+        for existential in cancellableExistentials {
+          // Dedup against the whole target set (already-stored + already-appended
+          // from this batch), mirroring the single-existential insert.
+          if !storage.cancellableExistentials.contains(where: { _isSameInstance($0, existential) }) {
+            storage.cancellableExistentials.append(existential)
+          }
+        }
         return nil
       }
     }

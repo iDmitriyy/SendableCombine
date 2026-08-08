@@ -306,8 +306,8 @@ struct CancellationBagTests {
 
     do {
       let bag = CancellationBag()
-      bag.insert(cancellable)
-      bag.insert(cancellable) // Duplicate
+      bag.insert(cancellable as any Cancellable)
+      bag.insert(cancellable as any Cancellable) // Duplicate insertion
       #expect(cancellable.cancelCount == 0)
     } // bag deinits
 
