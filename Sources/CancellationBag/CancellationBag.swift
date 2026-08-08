@@ -6,6 +6,7 @@
 //
 
 public import Combine
+import SendableCombineLogging
 import struct os.OSAllocatedUnfairLock
 
 // private import struct OrderedCollections.OrderedSet
@@ -423,9 +424,12 @@ extension CancellationBag.__TaskCancellationBag {
                  .suspended:
               break
             @unknown default:
-//              _log(.critical, LogEntry(code: .unexpectedCodeEntrance,
-//                                       message: "Unknown URLSessionDataTask state",
-//                                       info: ["dataTask.state": "\(dataTask.state)"]))
+              let message = "URLSessionDataTask state transitioned to a future, unknown state. " +
+                "The observation is being torn down to avoid a dangling continuation. "
+                + "Library Need to be updated to properly handle this case."
+              _log(.critical, SendableCombineLogEntry(code: .unexpectedCodeEntrance,
+                                                      message: message,
+                                                      info: ["dataTask.state": "\(dataTask.state)"]))
               wasResumed = true
               continuation.resume()
             }

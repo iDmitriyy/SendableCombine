@@ -14,17 +14,14 @@ let package = Package(
   ],
   targets: [
     .target(name: "SendablePublishers"),
-    .target(name: "CancellationBag", swiftSettings: [
-      .enableExperimentalFeature("StaticExclusiveOnly"),
-    ]),
+    .target(name: "CancellationBag",
+            dependencies: ["SendableCombineLogging"],
+            swiftSettings: [.enableExperimentalFeature("StaticExclusiveOnly")]),
     .target(name: "SendableCombineLogging"),
     .target(name: "CurrentValuePublisher",
             dependencies: ["SendablePublishers"]),
     .target(name: "MainActorPublishers",
-            dependencies: [
-              "SendablePublishers",
-              "SendableCombineLogging",
-            ]),
+            dependencies: ["SendablePublishers","SendableCombineLogging"]),
     .target(name: "SendableCombine",
             dependencies: [
               "SendablePublishers",
@@ -32,6 +29,9 @@ let package = Package(
               "CurrentValuePublisher",
               "MainActorPublishers",
             ]),
+    
+    // MARK: - Test Targets
+    
     .testTarget(name: "SendablePublishersTests",
                 dependencies: ["SendablePublishers"]),
     .testTarget(name: "CancellationBagTests",
@@ -43,8 +43,7 @@ let package = Package(
                   "MainActorPublishers",
                   "SendableCombineLogging",
                 ]),
-    .testTarget(name: "SendableCombineTests",
-                dependencies: ["SendableCombine"]),
+    .testTarget(name: "SendableCombineTests", dependencies: ["SendableCombine"]),
   ],
   swiftLanguageModes: [.v6],
 )
