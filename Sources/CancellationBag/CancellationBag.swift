@@ -447,17 +447,17 @@ extension CancellationBag.__TaskCancellationBag {
 
 // ------------------
 
-// TODO: Remove it when (Unique)OrderedSet from Swift-Collections become part of standard library
+// Improvement: Remove it when (Unique)OrderedSet from Swift-Collections become part of standard library
 fileprivate typealias OrderedSet<Element> = ContiguousArray<Element>
 
-extension OrderedSet where Element: Hashable {
+extension OrderedSet where Element: AnyObject {
   fileprivate mutating func insert(_ element: Element) {
-    if !contains(element) {
-      append(element)
-    }
+    let notContained = allSatisfy { $0 !== element }
+    guard notContained else { return }
+    append(element)
   }
   
-  fileprivate mutating func remove(_ element: Element) { removeAll(where: { $0 == element }) }
+  fileprivate mutating func remove(_ element: Element) { removeAll(where: { $0 === element }) }
 }
 
 extension ContiguousArray {
@@ -472,5 +472,3 @@ extension ContiguousArray {
     }
   }
 }
-
-// TODO: - add Unit tests:
