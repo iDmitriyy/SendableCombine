@@ -74,14 +74,14 @@ func collectValues<P: Publisher & Sendable, T: Sendable>(
   expectedCount: Int,
   timeout: Duration,
 ) -> Task<[T], any Error> where P.Output == T, P.Failure == Never {
-  // 1. Возвращаем Task, который начинает выполняться НЕМЕДЛЕННО
+  // 1. Return a Task that starts executing IMMEDIATELY
   Task.immediate {
     let gate = ResumptionGate()
     
     typealias TestState = (received: [T], cancellable: AnyCancellable?)
     let testState = OSUnfairLock<TestState>(uncheckedState: ([], nil))
 
-    // Гарантируем, что подписка живет, пока Task не завершится
+    // Guarantee that the subscription lives until the Task completes
     defer {
 //      _ = consume cancellable
     }
