@@ -174,8 +174,6 @@ public struct CancellationBag: ~Copyable, Sendable {
   // MARK: - Insert single Cancellable
 
   public func insert(_ cancellableObject: AnyCancellable) {
-//    __insert_withLock(object: cancellableObject)?.cancel() // Cancel outside the lock to prevent reentrancy
-    
     __storage.withLockUnchecked { storage -> AnyCancellable? in
       if storage.isDisposed {
         return cancellableObject
@@ -185,10 +183,6 @@ public struct CancellationBag: ~Copyable, Sendable {
       }
     }?.cancel()
   }
-
-//  private func __insert_withLock(object: AnyCancellable) -> AnyCancellable? {
-//    
-//  }
 
   public func insert(_ cancellable: any Cancellable) {
     if let cancellableObject = cancellable as? AnyCancellable {
@@ -226,13 +220,8 @@ public struct CancellationBag: ~Copyable, Sendable {
     // Cancel outside the lock to prevent reentrancy
     toCancel?.forEach { $0.cancel() }
   }
-
-  // TODO: ?@_specialize(where C == Array<AnyCancellable>)
-  public func insert(_ cancellables: some Collection<any Cancellable>) {
-    __insert_withLock(cancellables)
-  }
   
-  private func __insert_withLock(_ cancellables: some Collection<any Cancellable>) {
+  public func insert(_ cancellables: some Collection<any Cancellable>) {
     var cancellableObjects: [AnyCancellable] = []
     var cancellableExistentials: [any Cancellable] = []
 
@@ -302,7 +291,7 @@ extension CancellationBag {
       }
     }
   }
-
+  
   public func withCancellationOnBagDisposal<Success, Failure>(insert task: Task<Success, Failure>) {
     // taskBag is nil if `CancellationBag` was disposed.
     if let taskBag = __taskBag_withLock() {
