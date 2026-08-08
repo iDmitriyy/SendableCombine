@@ -14,6 +14,13 @@ final class TestCancellable: Cancellable, @unchecked Sendable {
   func cancel() { cancelCount += 1 }
 }
 
+/// A value-typed `Cancellable`: each copied value shares the same `TestCancellable`
+/// reference, so the test can observe how many copies were stored and cancelled.
+struct TestStructCancellable: Cancellable {
+  let cancellableObject = TestCancellable()
+  func cancel() { cancellableObject.cancel() }
+}
+
 @Suite("CancellationBag")
 struct CancellationBagTests {
 
@@ -287,21 +294,21 @@ struct CancellationBagTests {
 
   @Test("Insert duplicate AnyCancellable only stored once")
   func insertDuplicateAnyCancellableOnlyStoredOnce() {
-    var isCancelled = false
-    let cancellable = AnyCancellable { isCancelled = true }
+    let testCancellable = TestCancellable()
+    let cancellable = AnyCancellable { testCancellable.cancel() }
 
     do {
       let bag = CancellationBag()
       bag.insert(cancellable)
       bag.insert(cancellable) // Duplicate
-      #expect(isCancelled == false)
+      #expect(testCancellable.cancelCount == 0)
     } // bag deinits
 
-    #expect(isCancelled == true) // Should only cancel once
+    #expect(testCancellable.cancelCount == 1) // Should only cancel once
   }
 
-  @Test("Insert duplicate protocol Cancellable only stored once")
-  func insertDuplicateProtocolCancellableOnlyStoredOnce() {
+  @Test("Insert duplicate class instance as any Cancellable only stored once")
+  func insertDuplicateClassCancellableOnlyStoredOnce() {
     let cancellable = TestCancellable()
 
     do {
@@ -311,7 +318,23 @@ struct CancellationBagTests {
       #expect(cancellable.cancelCount == 0)
     } // bag deinits
 
-    #expect(cancellable.cancelCount == 1) // Should only cancel once
+    #expect(cancellable.cancelCount == 1) // Deduped by identity: only one stored and cancelled
+  }
+
+  @Test("Duplicate struct instance as any Cancellable stores both copies and cancels each")
+  func insertDuplicateStructCancellableStoredAndCancelledTwice() {
+    let cancellable = TestStructCancellable()
+
+    do {
+      let bag = CancellationBag()
+      bag.insert(cancellable as any Cancellable)
+      bag.insert(cancellable as any Cancellable) // Duplicate insertion
+      #expect(cancellable.cancellableObject.cancelCount == 0)
+    } // bag deinits
+
+    // A struct has no stable identity, so each copy counts as a distinct
+    // insertion: both stored values are cancelled, i.e. twice in total.
+    #expect(cancellable.cancellableObject.cancelCount == 2)
   }
 }
 
