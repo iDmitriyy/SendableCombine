@@ -10,17 +10,17 @@ import SendableCombineLogging
 struct SignalTests {
   // MARK: - Sharing Behavior
 
-  @Suite("testSignalSharing_WhenErroring")
+  @Suite("testSignalSharing_WhenErroring") // FIXME: - fails
   struct SharingWhenErroring {
     @Test("shares single subscription across multiple observers and resubscribes after error")
     func sharesSingleSubscriptionAndResubscribes() async throws {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, TestError>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignalIgnoringError()
 
-      let task1 = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(100))
-      let task2 = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(100))
+      let task1 = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(10))
+      let task2 = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(10))
 
       subject.send(1)
 
@@ -39,9 +39,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignal()
 
-      let task = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(10))
 
       subject.send(1)
       subject.send(2)
@@ -60,9 +60,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, TestError>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignalIgnoringError()
 
-      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
 
       subject.send(1)
       subject.send(completion: .failure(.dummyError))
@@ -79,9 +79,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, TestError>()
-      let signal = Signal(failableUpstream: subject, catchError: { -1 })
+      let signal = subject.asSignal(catchError: { -1 })
 
-      let task = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(10))
 
       subject.send(1)
       subject.send(completion: .failure(.dummyError))
@@ -100,11 +100,11 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal1 = Signal(failableUpstream: subject)
-      let signal2 = Signal(failableUpstream: subject)
+      let signal1 = subject.asSignal()
+      let signal2 = subject.asSignal()
 
-      let task1 = collectValues(publisher: signal1, expectedCount: 2, timeout: .milliseconds(100))
-      let task2 = collectValues(publisher: signal2, expectedCount: 2, timeout: .milliseconds(100))
+      let task1 = collectValues(publisher: signal1, expectedCount: 2, timeout: .milliseconds(10))
+      let task2 = collectValues(publisher: signal2, expectedCount: 2, timeout: .milliseconds(10))
 
       subject.send(1)
       subject.send(2)
@@ -127,9 +127,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignal()
 
-      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
 
       subject.send(1)
 
@@ -142,10 +142,10 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignal()
 
-      let task1 = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
-      let task2 = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
+      let task1 = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
+      let task2 = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
 
       subject.send(1)
 
@@ -166,9 +166,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignal()
 
-      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100)) as Task<[Int], any Error>
+      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10)) as Task<[Int], any Error>
 
       subject.send(1)
 
@@ -188,7 +188,7 @@ struct SignalTests {
       let subject = PassthroughSubject<Int, Never>()
       let signal = subject.asSignal()
 
-      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
 
       subject.send(1)
 
@@ -206,9 +206,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, TestError>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignalIgnoringError()
 
-      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
 
       subject.send(1)
       subject.send(completion: .failure(.dummyError))
@@ -227,9 +227,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignal()
 
-      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 1, timeout: .milliseconds(10))
 
       subject.send(1)
 
@@ -247,9 +247,9 @@ struct SignalTests {
       guard #available(anyAppleOS 26.0, *) else { return }
 
       let subject = PassthroughSubject<Int, Never>()
-      let signal = Signal(failableUpstream: subject)
+      let signal = subject.asSignal()
 
-      let task = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(100))
+      let task = collectValues(publisher: signal, expectedCount: 2, timeout: .milliseconds(10))
 
       subject.send(1)
       subject.send(2)

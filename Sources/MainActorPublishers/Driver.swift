@@ -137,30 +137,39 @@ extension Driver {
         /// and safely relays individual downstream Demand to its active subscribers.
         let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
 
-        /// 2. Multicast bridges the upstream to the buffer subject.
-        /// This ensures the upstream is shared and subscribed to exactly ONCE (subscriptionCount == 1).
-        let connectable = infallibleUpstream
-          .handleEvents(receiveCompletion: { completion in
-            _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                      publisherName: "Driver<\(Output.self)>",
-                                      completion: completion)
-          })
-          .multicast(subject: bufferSubject)
+        func makeMainActorSharedStream(from infallible: some Publisher<Output, Never>)
+          -> AnyPublisher<Output, Never> {
+          /// 2. Multicast bridges the upstream to the buffer subject.
+          /// This ensures the upstream is shared and subscribed to exactly ONCE (subscriptionCount == 1).
+          let connectable = infallible
+            .multicast(subject: bufferSubject)
 
-        // 3. Atomically connect to the upstream. Demand tracking flows natively via internal Combine mechanisms.
-        state.cancellable = connectable.connect()
+          // 3. Atomically connect to the upstream. Demand tracking flows natively via internal Combine mechanisms.
+          state.cancellable = connectable.connect()
 
-        /// 4. Re-schedule the shared stream onto the main queue **downstream** of the buffer.
-        /// Placing `receive(on:)` here (instead of upstream of `multicast`) guarantees that the buffer's
-        /// synchronously replayed current value is also delivered on the main thread, no matter which
-        /// thread performed the subscription.
-        let shared = connectable
-          .receive(on: DispatchQueue.main)
-          .eraseToAnyPublisher()
+          /// 4. Re-schedule the shared stream onto the main queue **downstream** of the buffer.
+          /// Placing `receive(on:)` here (instead of upstream of `multicast`) guarantees that the buffer's
+          /// synchronously replayed current value is also delivered on the main thread, no matter which
+          /// thread performed the subscription.
+          let shared = connectable
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
 
-        state.publisher = shared
+          state.publisher = shared
+          return shared
+        }
 
-        return shared
+        if logWhenTerminated {
+          let withTerminationDiagnostic = infallibleUpstream
+            .handleEvents(receiveCompletion: { completion in
+              _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                        publisherName: "Driver<\(Output.self)>",
+                                        completion: completion)
+            })
+          return makeMainActorSharedStream(from: withTerminationDiagnostic)
+        } else {
+          return makeMainActorSharedStream(from: infallibleUpstream)
+        }
       }
     }
 
@@ -336,7 +345,7 @@ extension Publisher where Output: Sendable {
     }
 
     if logWhenTerminated {
-      let withTerminationDiagnostic = self.handleEvents(receiveCompletion: { completion in
+      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
                                   publisherName: "Driver<\(Output.self)>",
                                   completion: completion)
@@ -374,7 +383,7 @@ extension Publisher where Output: Sendable {
     }
 
     if logWhenTerminated {
-      let withTerminationDiagnostic = self.handleEvents(receiveCompletion: { completion in
+      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
                                   publisherName: "Driver<\(Output.self)>",
                                   completion: completion)
