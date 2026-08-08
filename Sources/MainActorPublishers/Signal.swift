@@ -90,8 +90,6 @@ public struct Signal<Element>: Publisher {
     _upstream = infallibleUpstream
       .handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   finishedCode: .signalUpstreamTerminatedWithCompletion,
-                                   failureCode: .signalUpstreamTerminatedWithFailure,
                                    publisherName: "Signal<\(Output.self)>",
                                    completion: completion)
       })
@@ -119,8 +117,6 @@ public struct Signal<Element>: Publisher {
     _upstream = failableUpstream
       .handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   finishedCode: .signalUpstreamTerminatedWithCompletion,
-                                   failureCode: .signalUpstreamTerminatedWithFailure,
                                    publisherName: "Signal<\(Output.self)>",
                                    completion: completion)
       })
@@ -149,8 +145,6 @@ public struct Signal<Element>: Publisher {
     _upstream = failableUpstream
       .handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   finishedCode: .signalUpstreamTerminatedWithCompletion,
-                                   failureCode: .signalUpstreamTerminatedWithFailure,
                                    publisherName: "Signal<\(Output.self)>",
                                    completion: completion)
       })

@@ -56,13 +56,11 @@ extension SendableCombineLogEntry {
 package enum SendableCombineInternalErrorCode: Int, Sendable {
   case loggingObserverReinjection = 0
   case unexpectedNilObject = 1
-
-  case driverUpstreamTerminatedWithCompletion = 20
-  case driverUpstreamTerminatedWithFailure
+  
   case driverInitialValueDropped
 
-  case signalUpstreamTerminatedWithCompletion = 30
-  case signalUpstreamTerminatedWithFailure
+  case upstreamTerminatedWithCompletion = 30
+  case upstreamTerminatedWithFailure
 
   case unexpectedCodeEntrance
 }

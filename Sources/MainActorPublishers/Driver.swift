@@ -137,8 +137,6 @@ extension Driver {
         let connectable = infallibleUpstream
           .handleEvents(receiveCompletion: { completion in
             _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                       finishedCode: .driverUpstreamTerminatedWithCompletion,
-                                       failureCode: .driverUpstreamTerminatedWithFailure,
                                        publisherName: "Driver<\(Output.self)>",
                                        completion: completion)
           })
@@ -272,8 +270,6 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
     let upstream = self
       .handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: true,
-                                   finishedCode: .driverUpstreamTerminatedWithCompletion,
-                                   failureCode: .driverUpstreamTerminatedWithFailure,
                                    publisherName: "Driver<\(Output.self)>",
                                    completion: completion)
       })
@@ -325,8 +321,6 @@ extension Publisher where Output: Sendable {
     let processed = self
       .handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   finishedCode: .driverUpstreamTerminatedWithCompletion,
-                                   failureCode: .driverUpstreamTerminatedWithFailure,
                                   publisherName: "Driver<\(Output.self)>",
                                    completion: completion)
       })
@@ -359,8 +353,6 @@ extension Publisher where Output: Sendable {
     let processed = self
       .handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   finishedCode: .driverUpstreamTerminatedWithCompletion,
-                                   failureCode: .driverUpstreamTerminatedWithFailure,
                                    publisherName: "Driver<\(Output.self)>",
                                    completion: completion)
       })
