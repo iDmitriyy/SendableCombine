@@ -61,6 +61,9 @@ package enum SendableCombineInternalErrorCode: Int, Sendable {
   case driverUpstreamTerminatedWithFailure
   case driverInitialValueDropped
 
+  case signalUpstreamTerminatedWithCompletion = 30
+  case signalUpstreamTerminatedWithFailure
+
   case unexpectedCodeEntrance
 }
 
