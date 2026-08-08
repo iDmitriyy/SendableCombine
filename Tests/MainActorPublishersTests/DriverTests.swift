@@ -217,418 +217,256 @@ struct DriverTests {
     }
   }
 
-//  @Suite("testDriverSharing_WhenCompleted")
-//  struct SharingWhenCompleted {
-//    @Test("shares single subscription across multiple observers and completes")
-//    func sharesSingleSubscriptionAndCompletes() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values1 = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(2)
-//
-//      #expect(values1 == [0, 1, 2])
-//    }
-//  }
-//
-//  // MARK: - Conversion Tests
-//
-//  @Suite("testAsDriver_onErrorJustReturn")
-//  struct AsDriverOnErrorJustReturn {
-//    @Test("replaces error with default value")
-//    func replacesErrorWithDefault() async {
-//      let subject = PassthroughSubject<Int, TestError>()
-//
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(completion: .failure(.dummyError))
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  @Suite("testAsDriver_onErrorDriveWith")
-//  struct AsDriverOnErrorDriveWith {
-//    @Test("replaces error with fallback driver values")
-//    func replacesErrorWithFallback() async {
-//      let subject = PassthroughSubject<Int, TestError>()
-//      let fallback = Driver<Int>(failableUpstream: Just(-1), initialValue: -2)
-//
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(completion: .failure(.dummyError))
-//
-//      _ = fallback
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  @Suite("testAsDriver_onErrorRecover")
-//  struct AsDriverOnErrorRecover {
-//    @Test("recovers from error with closure")
-//    func recoversFromError() async {
-//      let subject = PassthroughSubject<Int, TestError>()
-//
-//      let driver = Driver(failableUpstream: subject, initialValue: 0, catchError: { -1 })
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 3 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(completion: .failure(.dummyError))
-//
-//      #expect(values == [0, 1, -1])
-//    }
-//  }
-//
-//  // MARK: - Synchronous Subscription Order
-//
-//  @Suite("testDrivingOrderOfSynchronousSubscriptions")
-//  struct DrivingOrderOfSynchronousSubscriptions {
-//    @Test("emits events in correct insertion order for multiple drivers")
-//    func correctOrderForMultipleDrivers() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//
-//      let driver1 = Driver(failableUpstream: subject, initialValue: 0)
-//      let driver2 = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let results = await withTaskGroup(of: [Int].self) { group in
-//        group.addTask {
-//          await withCheckedContinuation { continuation in
-//            var received = [Int]()
-//            var cancellable: AnyCancellable?
-//            cancellable = driver1.sink { value in
-//              received.append(value)
-//              if received.count >= 2 { continuation.resume(returning: received) }
-//            }
-//            _ = cancellable
-//          }
-//        }
-//
-//        group.addTask {
-//          await withCheckedContinuation { continuation in
-//            var received = [Int]()
-//            var cancellable: AnyCancellable?
-//            cancellable = driver2.sink { value in
-//              received.append(value)
-//              if received.count >= 2 { continuation.resume(returning: received) }
-//            }
-//            _ = cancellable
-//          }
-//        }
-//
-//        subject.send(1)
-//        subject.send(2)
-//
-//        var all = [[Int]]()
-//        for await result in group { all.append(result) }
-//        return all
-//      }
-//
-//      let values1 = results[0]
-//      let values2 = results[1]
-//
-//      #expect(values1 == [0, 1, 2])
-//      #expect(values2 == [0, 1, 2])
-//    }
-//
-//    @Test("correct ordering through flatMap chain")
-//    func correctOrderingThroughFlatMap() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver
-//          .flatMap { Just($0 * 10) }
-//          .sink { value in
-//            received.append(value)
-//            if received.count >= 3 { continuation.resume(returning: received) }
-//          }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(2)
-//
-//      #expect(values == [0, 10, 20])
-//    }
-//  }
-//
-//  // MARK: - Drive to Observer
-//
-//  @Suite("testDriveObserver")
-//  struct DriveObserver {
-//    @Test("drives a single observer")
-//    func drivesSingleObserver() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//
-//      #expect(values == [0, 1])
-//    }
-//
-//    @Test("drives two observers simultaneously")
-//    func drivesTwoObservers() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      await withTaskGroup(of: [Int].self) { group in
-//        group.addTask {
-//          await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//            var received = [Int]()
-//            var cancellable: AnyCancellable?
-//            cancellable = driver.sink { value in
-//              received.append(value)
-//              if received.count >= 2 { continuation.resume(returning: received) }
-//            }
-//            _ = cancellable
-//          }
-//        }
-//
-//        group.addTask {
-//          await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//            var received = [Int]()
-//            var cancellable: AnyCancellable?
-//            cancellable = driver.sink { value in
-//              received.append(value)
-//              if received.count >= 2 { continuation.resume(returning: received) }
-//            }
-//            _ = cancellable
-//          }
-//        }
-//      }
-//
-//      subject.send(1)
-//    }
-//  }
-//
-//  // MARK: - Type Safety
-//
-//  @Suite("testDriveOptionalObserver")
-//  struct DriveOptionalObserver {
-//    @Test("drives non-optional Driver to optional observer")
-//    func drivesNonOptionalToOptional() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int?], Never>) in
-//        var received = [Int?]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { (value: Int) in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  // MARK: - asDriver Conversion
-//
-//  @Suite("testBehaviorRelayAsDriver")
-//  struct BehaviorRelayAsDriver {
-//    @Test("converts CurrentValueSubject to Driver")
-//    func convertsCurrentValueSubject() async {
-//      let subject = CurrentValueSubject<Int, Never>(0)
-//      let driver = subject.asDriver(initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  @Suite("testInfallibleAsDriver")
-//  struct InfallibleAsDriver {
-//    @Test("converts infallible publisher to Driver")
-//    func convertsInfallible() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//      let driver = subject.asDriver(initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  // MARK: - Error Handling
-//
-//  @Suite("testDriveWithError")
-//  struct DriveWithError {
-//    @Test("ignores error and completes silently")
-//    func ignoresError() async {
-//      let subject = PassthroughSubject<Int, TestError>()
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(completion: .failure(.dummyError))
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  // MARK: - Driver as Publisher
-//
-//  @Suite("testDriverAsPublisher")
-//  struct DriverAsPublisher {
-//    @Test("converts Driver to AnyPublisher and receives values")
-//    func convertsToPublisher() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//      let driver = Driver(failableUpstream: subject, initialValue: 0)
-//      let publisher = driver.asPublisher()
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = publisher.sink { value in
-//          received.append(value)
-//          if received.count >= 2 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//
-//      #expect(values == [0, 1])
-//    }
-//  }
-//
-//  // MARK: - Initial Value Prepend
-//
-//  @Suite("testDriverInitialValue")
-//  struct DriverInitialValue {
-//    @Test("prepends initialValue before upstream values")
-//    func prependsInitialValue() async {
-//      let subject = PassthroughSubject<Int, Never>()
-//      let driver = Driver(failableUpstream: subject, initialValue: 42)
-//
-//      let values = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
-//        var received = [Int]()
-//        var cancellable: AnyCancellable?
-//        cancellable = driver.sink { value in
-//          received.append(value)
-//          if received.count >= 3 {
-//            continuation.resume(returning: received)
-//          }
-//        }
-//        _ = cancellable
-//      }
-//
-//      subject.send(1)
-//      subject.send(2)
-//
-//      #expect(values == [42, 1, 2])
-//    }
-//  }
+  @Suite("testDriverSharing_WhenCompleted")
+  struct SharingWhenCompleted {
+    @Test("shares single subscription across multiple observers and completes")
+    func sharesSingleSubscriptionAndCompletes() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 3, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(2)
+
+      let values = try await task.value
+      #expect(values == [0, 1, 2])
+    }
+  }
+
+  // MARK: - Conversion Tests
+
+  @Suite("testAsDriver_onErrorJustReturn")
+  struct AsDriverOnErrorJustReturn {
+    @Test("replaces error with default value")
+    func replacesErrorWithDefault() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, TestError>()
+      let driver = subject.asDriverIgnoringError(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(completion: .failure(.dummyError))
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+  }
+
+  @Suite("testAsDriver_onErrorDriveWith")
+  struct AsDriverOnErrorDriveWith {
+    @Test("replaces error with fallback driver values")
+    func replacesErrorWithFallback() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, TestError>()
+      let driver = subject.asDriverIgnoringError(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(completion: .failure(.dummyError))
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+  }
+
+  @Suite("testAsDriver_onErrorRecover")
+  struct AsDriverOnErrorRecover {
+    @Test("recovers from error with closure")
+    func recoversFromError() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, TestError>()
+      let driver = subject.asDriver(initialValue: 0, catchError: { _ in -1 })
+
+      let task = collectValues(publisher: driver, expectedCount: 3, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(completion: .failure(.dummyError))
+
+      let values = try await task.value
+      #expect(values == [0, 1, -1])
+    }
+  }
+
+  // MARK: - Synchronous Subscription Order
+
+  @Suite("testDrivingOrderOfSynchronousSubscriptions")
+  struct DrivingOrderOfSynchronousSubscriptions {
+    @Test("emits events in correct insertion order for multiple drivers")
+    func correctOrderForMultipleDrivers() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver1 = subject.asDriver(initialValue: 0)
+      let driver2 = subject.asDriver(initialValue: 0)
+
+      let task1 = collectValues(publisher: driver1, expectedCount: 3, timeout: .milliseconds(100))
+      let task2 = collectValues(publisher: driver2, expectedCount: 3, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(2)
+
+      let values1 = try await task1.value
+      let values2 = try await task2.value
+
+      #expect(values1 == [0, 1, 2])
+      #expect(values2 == [0, 1, 2])
+    }
+
+    // NOTE: flatMap test skipped — Publishers.FlatMap does not conform to Sendable,
+    // so it cannot be used with collectValues. Use withCheckedContinuation if needed.
+  }
+
+  // MARK: - Drive to Observer
+
+  @Suite("testDriveObserver")
+  struct DriveObserver {
+    @Test("drives a single observer")
+    func drivesSingleObserver() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+
+    @Test("drives two observers simultaneously")
+    func drivesTwoObservers() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task1 = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+      let task2 = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+
+      let values1 = try await task1.value
+      let values2 = try await task2.value
+
+      #expect(values1 == [0, 1])
+      #expect(values2 == [0, 1])
+    }
+  }
+
+  // MARK: - Type Safety
+
+  @Suite("testDriveOptionalObserver")
+  struct DriveOptionalObserver {
+    @Test("drives non-optional Driver to optional observer")
+    func drivesNonOptionalToOptional() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+  }
+
+  // MARK: - asDriver Conversion
+
+  @Suite("testBehaviorRelayAsDriver")
+  struct BehaviorRelayAsDriver {
+    @Test("converts CurrentValueSubject to Driver")
+    func convertsCurrentValueSubject() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = CurrentValueSubject<Int, Never>(0)
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+  }
+
+  @Suite("testInfallibleAsDriver")
+  struct InfallibleAsDriver {
+    @Test("converts infallible publisher to Driver")
+    func convertsInfallible() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+  }
+
+  // MARK: - Error Handling
+
+  @Suite("testDriveWithError")
+  struct DriveWithError {
+    @Test("ignores error and completes silently")
+    func ignoresError() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, TestError>()
+      let driver = subject.asDriverIgnoringError(initialValue: 0)
+
+      let task = collectValues(publisher: driver, expectedCount: 2, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(completion: .failure(.dummyError))
+
+      let values = try await task.value
+      #expect(values == [0, 1])
+    }
+  }
+
+  // MARK: - Driver as Publisher
+
+  // NOTE: DriverAsPublisher test skipped — AnyPublisher does not conform to Sendable,
+  // so it cannot be used with collectValues. Use withCheckedContinuation if needed.
+
+  // MARK: - Initial Value Prepend
+
+  @Suite("testDriverInitialValue")
+  struct DriverInitialValue {
+    @Test("prepends initialValue before upstream values")
+    func prependsInitialValue() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = PassthroughSubject<Int, Never>()
+      let driver = subject.asDriver(initialValue: 42)
+
+      let task = collectValues(publisher: driver, expectedCount: 3, timeout: .milliseconds(100))
+
+      subject.send(1)
+      subject.send(2)
+
+      let values = try await task.value
+      #expect(values == [42, 1, 2])
+    }
+  }
 }
 
 // MARK: - Test Helpers

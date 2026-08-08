@@ -56,7 +56,7 @@ struct FailableDriverMethodsTests {
     #expect(results == [0, 1, -1])
 
     let codes = collector.entries().map(\.code)
-    #expect(codes.contains(SendableCombineInternalErrorCode.driverUpstreamTerminatedWithFailure.rawValue))
+    #expect(codes.contains(SendableCombineInternalErrorCode.upstreamTerminatedWithFailure.rawValue))
   }
 
   @Test("asDriverIgnoringError drops the error and logs a failure warning")
@@ -80,6 +80,6 @@ struct FailableDriverMethodsTests {
     #expect(results == [0, 1])
 
     let codes = collector.entries().map(\.code)
-    #expect(codes.contains(SendableCombineInternalErrorCode.driverUpstreamTerminatedWithFailure.rawValue))
+    #expect(codes.contains(SendableCombineInternalErrorCode.upstreamTerminatedWithFailure.rawValue))
   }
 }

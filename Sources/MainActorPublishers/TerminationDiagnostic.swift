@@ -20,6 +20,6 @@ func _logTerminationDiagnostic<Failure: Error>(
                                            message: message))
   case .failure(let error):
     message = prefix + "error: \(error). " + suffix
-    _log(.warning, SendableCombineLogEntry(code: .upstreamTerminatedWithFailure, message: "message"))
+    _log(.warning, SendableCombineLogEntry(code: .upstreamTerminatedWithFailure, message: message))
   }
 }
