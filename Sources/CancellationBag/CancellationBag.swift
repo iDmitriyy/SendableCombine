@@ -136,7 +136,7 @@ public struct CancellationBag: ~Copyable, Sendable {
   deinit {
     let toCancel = __setDisposed_AndConsumeStorage_withLock()
     
-    toCancel.cancellableObjects._forEach_UsingSpan_ { cancellable in
+    toCancel.cancellableObjects.forEach { cancellable in
       cancellable.cancel()
     }
     
@@ -144,7 +144,7 @@ public struct CancellationBag: ~Copyable, Sendable {
       cancellable.cancel()
     }
     
-    toCancel.tasksToCancel._forEach_UsingSpan_ { cancellable in
+    toCancel.tasksToCancel.forEach { cancellable in
       cancellable.cancel()
     }
   }
@@ -153,18 +153,18 @@ public struct CancellationBag: ~Copyable, Sendable {
     __storage.withLockUnchecked { storage -> sending ConsumedStorage in
       storage.isDisposed = true
       
-      let tasksToCancel: OrderedSet<any Cancellable & AnyObject>
+      let tasksToCancel: Set<AnyCancellableObj>
       if let taskBag = storage.taskCancellationBag {
         tasksToCancel = taskBag.__setDisposed_AndConsumeStorage_withLock()
         storage.taskCancellationBag = nil
       } else {
-        tasksToCancel = OrderedSet()
+        tasksToCancel = Set()
       }
       
       let cancellableObjects = storage.cancellableObjects
       let cancellableExistentials = storage.cancellableValueTypeExistentials
       
-      storage.cancellableObjects = OrderedSet()
+      storage.cancellableObjects = Set()
       storage.cancellableValueTypeExistentials = ContiguousArray()
 
       return (cancellableObjects, cancellableExistentials, tasksToCancel)
@@ -178,7 +178,7 @@ public struct CancellationBag: ~Copyable, Sendable {
       if storage.isDisposed {
         return cancellableObject
       } else {
-        storage.cancellableObjects.insert(cancellableObject)
+        storage.cancellableObjects.insert(AnyCancellableObj(cancellableObject))
         return nil
       }
     }?.cancel()
@@ -209,8 +209,8 @@ public struct CancellationBag: ~Copyable, Sendable {
       if storage.isDisposed {
         return anyCancellableObjects
       } else {
-        storage.cancellableObjects
-          .append(contentsOf: anyCancellableObjects.map { $0 as (any Cancellable & AnyObject) })
+        let wrapped = anyCancellableObjects.map { AnyCancellableObj($0 as any Cancellable & AnyObject) }
+        storage.cancellableObjects.insert(contentsOf: wrapped)
         return nil
       }
     }
@@ -249,16 +249,16 @@ public struct CancellationBag: ~Copyable, Sendable {
     }
   }
 
-  private typealias ConsumedStorage = (cancellableObjects: OrderedSet<any Cancellable & AnyObject>,
+  private typealias ConsumedStorage = (cancellableObjects: Set<AnyCancellableObj>,
                                        cancellableExistentials: ContiguousArray<any Cancellable>,
-                                       tasksToCancel: OrderedSet<any Cancellable & AnyObject>)
+                                       tasksToCancel: Set<AnyCancellableObj>)
   
   // TODO: ?make Storage ~Copyable.
   // Also deinit does not need withLock – we can access data directly. But if Storage is moveOnly, then
   // it is needed to be extracted from Mutex. Mutex need to be consumed in deinit which is not possible yet.
   // https://forums.swift.org/t/pitch-2-allowing-for-partial-mutation-and-consumption-inside-of-non-copyable-type-deinit/88437/3
   private struct Storage {
-    var cancellableObjects: OrderedSet<any Cancellable & AnyObject> = OrderedSet()
+    var cancellableObjects: Set<AnyCancellableObj> = Set()
     var cancellableValueTypeExistentials: ContiguousArray<any Cancellable> = ContiguousArray()
     var taskCancellationBag: __TaskCancellationBag?
     
@@ -309,7 +309,7 @@ extension CancellationBag {
     private let __storage: OSAllocatedUnfairLock<Storage>
 
     internal init() {
-      __storage = OSAllocatedUnfairLock(uncheckedState: (tasks: OrderedSet(), isDisposed: false))
+      __storage = OSAllocatedUnfairLock(uncheckedState: (tasks: Set(), isDisposed: false))
     }
 
     deinit {} // Tasks are cancelled by `CancellationBag` in deinit
@@ -438,18 +438,27 @@ extension CancellationBag.__TaskCancellationBag {
 
 // ------------------
 
-// Improvement: Remove it when (Unique)OrderedSet from Swift-Collections become part of standard library
-fileprivate typealias OrderedSet<Element> = ContiguousArray<Element>
+/// A hashable identity wrapper around a reference-type `Cancellable`, so storage can
+/// deduplicate instances via `==` (object identity) and hash them via `ObjectIdentifier`.
+fileprivate struct AnyCancellableObj: Hashable {
+  let cancellable: any Cancellable & AnyObject
 
-extension OrderedSet where Element == (any Cancellable & AnyObject) {
-  @_transparent
-  fileprivate mutating func insert(_ element: Element) {
-    let notContained = allSatisfy { $0 !== element }
-    guard notContained else { return }
-    append(element)
+  init(_ cancellable: any Cancellable & AnyObject) {
+    self.cancellable = cancellable
   }
-  
-  fileprivate mutating func remove(_ element: Element) { removeAll(where: { $0 === element }) }
+
+  @_transparent
+  func cancel() {
+    cancellable.cancel()
+  }
+
+  static func == (lhs: AnyCancellableObj, rhs: AnyCancellableObj) -> Bool {
+    lhs.cancellable === rhs.cancellable
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(cancellable as AnyObject))
+  }
 }
 
 extension ContiguousArray {
