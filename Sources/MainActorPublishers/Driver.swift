@@ -270,16 +270,24 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
   /// * **State Preservation**: The driver inherits the current value of the subject at the moment
   ///   of subscription and instantly streams any subsequent state modifications.
   ///
+  /// - Parameter logWhenTerminated: When `true` (default), logs upstream termination (`.finished` /
+  ///   `.failure`) as a diagnostic warning; `false` disables the logging.
   /// - Returns: A `Driver` instance.
-  public func asDriver() -> Driver<Output> {
-    let upstream = handleEvents(receiveCompletion: { completion in
-      _logTerminationDiagnostic(logWhenTerminated: true,
-                                publisherName: "Driver<\(Output.self)>",
-                                completion: completion)
-    })
-    .receive(on: DispatchQueue.main)
-    .eraseToAnyPublisher()
-    return Driver(_upstream: upstream)
+  public func asDriver(logWhenTerminated: Bool = true) -> Driver<Output> {
+    if logWhenTerminated {
+      let upstream = handleEvents(receiveCompletion: { completion in
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                  publisherName: "Driver<\(Output.self)>",
+                                  completion: completion)
+      })
+      .receive(on: DispatchQueue.main)
+      .eraseToAnyPublisher()
+      return Driver(_upstream: upstream)
+    } else {
+      let upstream = receive(on: DispatchQueue.main)
+        .eraseToAnyPublisher()
+      return Driver(_upstream: upstream)
+    }
   }
 }
 
@@ -322,14 +330,21 @@ extension Publisher where Output: Sendable {
   ///   if the upstream hasn't emitted anything.
   /// - Returns: A `Driver` instance.
   public func asDriverIgnoringError(initialValue: Output, logWhenTerminated: Bool = true) -> Driver<Output> {
-    let processed = handleEvents(receiveCompletion: { completion in
-      _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                publisherName: "Driver<\(Output.self)>",
-                                completion: completion)
-    })
-    .catch { _ in Empty<Output, Never>() }
+    func makeDriver(failableSource: some Publisher<Output, Failure>) -> Driver<Output> {
+      let infallible = failableSource.catch { _ in Empty<Output, Never>() }
+      return Driver(infallibleUpstream: infallible, initialValue: initialValue, logWhenTerminated: false)
+    }
 
-    return Driver(infallibleUpstream: processed, initialValue: initialValue, logWhenTerminated: false)
+    if logWhenTerminated {
+      let withTerminationDiagnostic = self.handleEvents(receiveCompletion: { completion in
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                  publisherName: "Driver<\(Output.self)>",
+                                  completion: completion)
+      })
+      return makeDriver(failableSource: withTerminationDiagnostic)
+    } else {
+      return makeDriver(failableSource: self)
+    }
   }
 
   /// Transforms a failable publisher into a driver stream, recovering from errors with a fallback state mapping.
@@ -353,13 +368,20 @@ extension Publisher where Output: Sendable {
   public func asDriver(initialValue: Output,
                        logWhenTerminated: Bool = true,
                        catchError: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
-    let processed = handleEvents(receiveCompletion: { completion in
-      _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                publisherName: "Driver<\(Output.self)>",
-                                completion: completion)
-    })
-    .catch { failure in Just(catchError(failure)) }
+    func makeDriver(failableSource: some Publisher<Output, Failure>) -> Driver<Output> {
+      let infallible = failableSource.catch { failure in Just(catchError(failure)) }
+      return Driver(infallibleUpstream: infallible, initialValue: initialValue, logWhenTerminated: false)
+    }
 
-    return Driver(infallibleUpstream: processed, initialValue: initialValue, logWhenTerminated: false)
+    if logWhenTerminated {
+      let withTerminationDiagnostic = self.handleEvents(receiveCompletion: { completion in
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                  publisherName: "Driver<\(Output.self)>",
+                                  completion: completion)
+      })
+      return makeDriver(failableSource: withTerminationDiagnostic)
+    } else {
+      return makeDriver(failableSource: self)
+    }
   }
 }

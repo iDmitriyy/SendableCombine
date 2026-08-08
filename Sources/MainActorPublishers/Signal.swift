@@ -67,7 +67,7 @@ extension Signal: @unchecked Sendable where Element: Sendable {}
 extension Signal {
   public typealias Output = Element
   public typealias Failure = Never
-  
+
   public func receive<S: Subscriber>(subscriber: S) where S.Failure == Never, S.Input == Element {
     _upstream.receive(subscriber: subscriber)
   }
@@ -122,15 +122,22 @@ extension Signal {
   ///     `.failure`) as a diagnostic warning; `false` disables the logging.
   public init<P: Publisher>(infallibleUpstream: P,
                             logWhenTerminated: Bool = true) where P.Output == Element, P.Failure == Never {
-    _upstream = infallibleUpstream
-      .handleEvents(receiveCompletion: { completion in
+    func makeSignal(_ source: some Publisher<Element, Never>) -> AnyPublisher<Element, Never> {
+      source.receive(on: DispatchQueue.main)
+        .share()
+        .eraseToAnyPublisher()
+    }
+
+    if logWhenTerminated {
+      let withTerminationDiagnostic = infallibleUpstream.handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   publisherName: "Signal<\(Output.self)>",
-                                   completion: completion)
+                                  publisherName: "Signal<\(Output.self)>",
+                                  completion: completion)
       })
-      .receive(on: DispatchQueue.main)
-      .share()
-      .eraseToAnyPublisher()
+      _upstream = makeSignal(withTerminationDiagnostic)
+    } else {
+      _upstream = makeSignal(infallibleUpstream)
+    }
   }
 }
 
@@ -154,14 +161,21 @@ extension Publisher where Failure == Never, Output: Sendable {
 extension Publisher where Output: Sendable {
   /// Transforms a failable publisher into a `Signal`, dropping any generated errors silently.
   public func asSignalIgnoringError(logWhenTerminated: Bool = true) -> Signal<Output> {
-    let processed = handleEvents(receiveCompletion: { completion in
-      _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                 publisherName: "Signal<\(Output.self)>",
-                                 completion: completion)
-    })
-    .catch { _ in Empty<Output, Never>() }
-    
-    return Signal(infallibleUpstream: processed, logWhenTerminated: false)
+    func makeSignal(_ source: some Publisher<Output, Failure>) -> Signal<Output> {
+      let infallible = source.catch { _ in Empty<Output, Never>() }
+      return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
+    }
+
+    if logWhenTerminated {
+      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                  publisherName: "Signal<\(Output.self)>",
+                                  completion: completion)
+      })
+      return makeSignal(withTerminationDiagnostic)
+    } else {
+      return makeSignal(self)
+    }
   }
 
   /// Transforms a failable publisher into a `Signal`, recovering from errors with a fallback event.
@@ -171,12 +185,12 @@ extension Publisher where Output: Sendable {
       let infallible = failableSource.catch { _ in Just(catchError()) }
       return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
     }
-    
+
     if logWhenTerminated {
-      let withTerminationDiagnostic = self.handleEvents(receiveCompletion: { completion in
+      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                   publisherName: "Signal<\(Output.self)>",
-                                   completion: completion)
+                                  publisherName: "Signal<\(Output.self)>",
+                                  completion: completion)
       })
       return makeSignal(failableSource: withTerminationDiagnostic)
     } else {
