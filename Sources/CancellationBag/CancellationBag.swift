@@ -174,6 +174,7 @@ public struct CancellationBag: ~Copyable, Sendable {
   // MARK: - Insert single Cancellable
 
   public func insert(_ cancellableObject: AnyCancellable) {
+    // TODO: use (any Cancellable & AnyObject)
     __storage.withLockUnchecked { storage -> AnyCancellable? in
       if storage.isDisposed {
         return cancellableObject
@@ -188,26 +189,26 @@ public struct CancellationBag: ~Copyable, Sendable {
     if let cancellableObject = cancellable as? AnyCancellable {
       insert(cancellableObject)
     } else {
-      __insert_withLock(existential: cancellable)?.cancel() // Cancel outside the lock to prevent reentrancy
-    }
-  }
-
-  // TODO: - may be cancel here? and name __insertOrCancel_withLock
-  private func __insert_withLock(existential: any Cancellable) -> (any Cancellable)? {
-    __storage.withLockUnchecked { storage in
-      if storage.isDisposed {
-        return existential
-      } else {
-        storage.cancellableExistentials.append(existential)
-        return nil
-      }
+      // Cancel outside the lock to prevent reentrancy
+      
+      __storage.withLockUnchecked { storage -> (any Cancellable)? in
+        if storage.isDisposed {
+          return cancellable
+        } else {
+          storage.cancellableExistentials.append(cancellable)
+          return nil
+        }
+      }?.cancel()
+      
+      // TODO: - (any Cancellable) can be AnyObject, then must be inserted once
+      // if struct then will inserted twice
     }
   }
 
   // MARK: - Insert multiple Cancellables
-
-  // TODO: - specialize for Array | OrderedSet, which one?
+  
   public func insert<C: Collection>(_ anyCancellableObjects: C) where C.Element == AnyCancellable {
+    // TODO: - use C.Element == (any Cancellable & AnyObject)
     let toCancel = __storage.withLockUnchecked { storage -> C? in
       if storage.isDisposed {
         return anyCancellableObjects
@@ -224,7 +225,9 @@ public struct CancellationBag: ~Copyable, Sendable {
   public func insert(_ cancellables: some Collection<any Cancellable>) {
     var cancellableObjects: [AnyCancellable] = []
     var cancellableExistentials: [any Cancellable] = []
-
+    // TODO: instead of [AnyCancellable] use [any Cancellable & AnyObject]
+    // This way value-type Cancellable instances will be separated from ref-type
+    
     // Split AnyCancellable vs other existentials
     for cancellable in cancellables {
       if let anyCancellableObject = cancellable as? AnyCancellable {
