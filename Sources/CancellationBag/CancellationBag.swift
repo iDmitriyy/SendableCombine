@@ -136,15 +136,18 @@ public struct CancellationBag: ~Copyable, Sendable {
   deinit {
     let toCancel = __setDisposed_AndConsumeStorage_withLock()
     
-    toCancel.cancellableObjects._forEach_UsingSpan_ { cancellable in
+    toCancel.cancellableObjects.forEach { cancellable in
       cancellable.cancel()
     }
     
-    toCancel.cancellableExistentials._forEach_UsingSpan_ { cancellable in
-      cancellable.cancel()
+    do {
+      let span = toCancel.cancellableExistentials.span
+      for index in span.indices {
+        span[index].cancel()
+      }
     }
     
-    toCancel.tasksToCancel._forEach_UsingSpan_ { cancellable in
+    toCancel.tasksToCancel.forEach { cancellable in
       cancellable.cancel()
     }
   }
@@ -153,19 +156,19 @@ public struct CancellationBag: ~Copyable, Sendable {
     __storage.withLockUnchecked { storage -> sending ConsumedStorage in
       storage.isDisposed = true
       
-      let tasksToCancel: OrderedSet<AnyCancellable>
+      let tasksToCancel: Set<AnyCancellableObj>
       if let taskBag = storage.taskCancellationBag {
         tasksToCancel = taskBag.__setDisposed_AndConsumeStorage_withLock()
         storage.taskCancellationBag = nil
       } else {
-        tasksToCancel = OrderedSet()
+        tasksToCancel = Set()
       }
       
       let cancellableObjects = storage.cancellableObjects
-      let cancellableExistentials = storage.cancellableExistentials
+      let cancellableExistentials = storage.cancellableValueTypeExistentials
       
-      storage.cancellableObjects = OrderedSet()
-      storage.cancellableExistentials = ContiguousArray()
+      storage.cancellableObjects = Set()
+      storage.cancellableValueTypeExistentials = ContiguousArray()
 
       return (cancellableObjects, cancellableExistentials, tasksToCancel)
     }
@@ -173,103 +176,71 @@ public struct CancellationBag: ~Copyable, Sendable {
 
   // MARK: - Insert single Cancellable
 
-  public func insert(_ cancellableObject: AnyCancellable) {
-    __insert_withLock(object: cancellableObject)?.cancel() // Cancel outside the lock to prevent reentrancy
-  }
-
-  private func __insert_withLock(object: AnyCancellable) -> AnyCancellable? {
-    __storage.withLockUnchecked { storage in
+  public func insert(_ cancellableObject: any Cancellable & AnyObject) {
+    __storage.withLockUnchecked { storage -> (any Cancellable & AnyObject)? in
       if storage.isDisposed {
-        return object
+        return cancellableObject
       } else {
-        storage.cancellableObjects.append(object)
+        storage.cancellableObjects.insert(AnyCancellableObj(cancellableObject))
         return nil
       }
-    }
+    }?.cancel()
   }
 
   public func insert(_ cancellable: any Cancellable) {
-    if let cancellableObject = cancellable as? AnyCancellable {
+    if let cancellableObject = cancellable as? any Cancellable & AnyObject {
+      // Reference type: deduplicated by identity and inserted once
       insert(cancellableObject)
     } else {
-      __insert_withLock(existential: cancellable)?.cancel() // Cancel outside the lock to prevent reentrancy
-    }
-  }
-
-  // TODO: - may be cancel here? and name __insertOrCancel_withLock
-  private func __insert_withLock(existential: any Cancellable) -> (any Cancellable)? {
-    __storage.withLockUnchecked { storage in
-      if storage.isDisposed {
-        return existential
-      } else {
-        if storage.cancellableExistentials.contains(where: { _isSameInstance($0, existential) }) {
-          return nil // Already stored; do not store and do not cancel
+      // Value type: each insert stores a fresh copy, so duplicates are allowed.
+      // Cancel outside the lock to prevent reentrancy.
+      __storage.withLockUnchecked { storage -> (any Cancellable)? in
+        if storage.isDisposed {
+          return cancellable
+        } else {
+          storage.cancellableValueTypeExistentials.append(cancellable)
+          return nil
         }
-        storage.cancellableExistentials.append(existential)
-        return nil
-      }
+      }?.cancel()
     }
-  }
-
-  /// Returns `true` when both existentials wrap the *same* class instance.
-  ///
-  /// Value-typed `Cancellable`s have no stable identity, so they are always
-  /// treated as distinct — mirroring how `AnyCancellable` dedup relies on its
-  /// value semantics, this keeps repeat inserts of one class instance from
-  /// being stored (and later cancelled) more than once.
-  private func _isSameInstance(_ a: any Cancellable, _ b: any Cancellable) -> Bool {
-    if let a = a as? any AnyObject, let b = b as? any AnyObject {
-      return a === b
-    }
-    return false
   }
 
   // MARK: - Insert multiple Cancellables
-
-  // TODO: - specialize for Array | OrderedSet, which one?
-  public func insert<C: Collection>(_ anyCancellableObjects: C) where C.Element == AnyCancellable {
+  
+  public func insert<C: Collection>(_ anyCancellableObjects: C) where C.Element: Cancellable & AnyObject {
     let toCancel = __storage.withLockUnchecked { storage -> C? in
       if storage.isDisposed {
         return anyCancellableObjects
       } else {
-        storage.cancellableObjects.append(contentsOf: anyCancellableObjects)
+        let wrapped = anyCancellableObjects.map { AnyCancellableObj($0 as any Cancellable & AnyObject) }
+        storage.cancellableObjects.formUnion(wrapped)
         return nil
       }
     }
 
     // Cancel outside the lock to prevent reentrancy
     toCancel?.forEach { $0.cancel() }
-  }
-
-  // TODO: ?@_specialize(where C == Array<AnyCancellable>)
-  public func insert(_ cancellables: some Collection<any Cancellable>) {
-    __insert_withLock(cancellables)
+    // FIXME: - C: Collection can contain same object twice. Need to make `toCancel` unique, add text
   }
   
-  private func __insert_withLock(_ cancellables: some Collection<any Cancellable>) {
-    // Split AnyCancellable vs other existentials
-    var cancellableObjects: [AnyCancellable] = []
-    var cancellableExistentials: [any Cancellable] = []
+  public func insert(_ cancellables: some Collection<any Cancellable>) {
+    var cancellableObjects: [any Cancellable & AnyObject] = []
+    var cancellableValueTypeExistentials: [any Cancellable] = []
 
+    // Split reference-type vs value-type Cancellables
     for cancellable in cancellables {
-      if let anyCancellableObject = cancellable as? AnyCancellable {
-        cancellableObjects.append(anyCancellableObject)
+      if let cancellableObject = cancellable as? any Cancellable & AnyObject {
+        cancellableObjects.append(cancellableObject)
       } else {
-        cancellableExistentials.append(cancellable)
+        cancellableValueTypeExistentials.append(cancellable)
       }
     }
 
     let toCancelExistentials = __storage.withLockUnchecked { storage -> [any Cancellable]? in
       if storage.isDisposed {
-        return cancellableExistentials
+        return cancellableValueTypeExistentials
       } else {
-        for existential in cancellableExistentials {
-          // Dedup against the whole target set (already-stored + already-appended
-          // from this batch), mirroring the single-existential insert.
-          if !storage.cancellableExistentials.contains(where: { _isSameInstance($0, existential) }) {
-            storage.cancellableExistentials.append(existential)
-          }
-        }
+        storage.cancellableValueTypeExistentials += cancellableValueTypeExistentials
         return nil
       }
     }
@@ -277,21 +248,22 @@ public struct CancellationBag: ~Copyable, Sendable {
     toCancelExistentials?.forEach { $0.cancel() }
 
     if !cancellableObjects.isEmpty {
+      // FIXME: - now it is recursion, func above not called
       insert(cancellableObjects) // re-use the previous function
     }
   }
 
-  private typealias ConsumedStorage = (cancellableObjects: OrderedSet<AnyCancellable>,
+  private typealias ConsumedStorage = (cancellableObjects: Set<AnyCancellableObj>,
                                        cancellableExistentials: ContiguousArray<any Cancellable>,
-                                       tasksToCancel: OrderedSet<AnyCancellable>)
+                                       tasksToCancel: Set<AnyCancellableObj>)
   
   // TODO: ?make Storage ~Copyable.
   // Also deinit does not need withLock – we can access data directly. But if Storage is moveOnly, then
   // it is needed to be extracted from Mutex. Mutex need to be consumed in deinit which is not possible yet.
   // https://forums.swift.org/t/pitch-2-allowing-for-partial-mutation-and-consumption-inside-of-non-copyable-type-deinit/88437/3
   private struct Storage {
-    var cancellableObjects: OrderedSet<AnyCancellable> = OrderedSet()
-    var cancellableExistentials: ContiguousArray<any Cancellable> = OrderedSet()
+    var cancellableObjects: Set<AnyCancellableObj> = Set()
+    var cancellableValueTypeExistentials: ContiguousArray<any Cancellable> = ContiguousArray()
     var taskCancellationBag: __TaskCancellationBag?
     
     var isDisposed: Bool = false
@@ -302,8 +274,6 @@ public struct CancellationBag: ~Copyable, Sendable {
 // MARK: - CancellationBag + Task
 
 // ══════════════════════════════════════════════════════════════════════════════
-
-//public import Foundation
 
 extension CancellationBag {
   /// returns `nil` if `TaskCancellationBag` in disposed state.
@@ -322,7 +292,7 @@ extension CancellationBag {
       }
     }
   }
-
+  
   public func withCancellationOnBagDisposal<Success, Failure>(insert task: Task<Success, Failure>) {
     // taskBag is nil if `CancellationBag` was disposed.
     if let taskBag = __taskBag_withLock() {
@@ -341,16 +311,16 @@ extension CancellationBag {
     private let __storage: OSAllocatedUnfairLock<Storage>
 
     internal init() {
-      __storage = OSAllocatedUnfairLock(uncheckedState: (tasks: OrderedSet(), isDisposed: false))
+      __storage = OSAllocatedUnfairLock(uncheckedState: (tasks: Set(), isDisposed: false))
     }
 
-    deinit {} // Tasks are cancelled by `CancellationBag` in deinit
+    // deinit {} // Tasks are cancelled by `CancellationBag` in its deinit
 
-    fileprivate final func __setDisposed_AndConsumeStorage_withLock() -> sending OrderedSet<AnyCancellable> {
+    fileprivate final func __setDisposed_AndConsumeStorage_withLock() -> sending Set<AnyCancellableObj> {
       __storage.withLockUnchecked { storage in
         storage.isDisposed = true
         let tasksToCancel = storage.tasks
-        storage.tasks = OrderedSet()
+        storage.tasks = Set()
         return tasksToCancel
       }
     }
@@ -361,7 +331,7 @@ extension CancellationBag {
       let inserted: Bool = __storage.withLockUnchecked { storage in
         guard !storage.isDisposed else { return false }
         
-        storage.tasks.insert(taskCanceller)
+        storage.tasks.insert(AnyCancellableObj(taskCanceller))
         return true
       }
       
@@ -375,11 +345,11 @@ extension CancellationBag {
       __storage.withLockUnchecked { storage -> Void in
         guard !storage.isDisposed else { return }
         
-        storage.tasks.remove(taskCanceller)
+        storage.tasks.remove(AnyCancellableObj(taskCanceller))
       }
     }
 
-    private typealias Storage = (tasks: OrderedSet<AnyCancellable>, isDisposed: Bool)
+    private typealias Storage = (tasks: Set<AnyCancellableObj>, isDisposed: Bool)
   }
 }
 
@@ -400,6 +370,7 @@ extension CancellationBag.__TaskCancellationBag {
       guard let taskCanceller else { return }
       // if self == nil or taskCancellable == nil then task was cancelled on bag disposal
       // otherwise clean up resources if bag was not yet disposed / deinited
+      // TODO: - cover all branched if self ==/!= nil + taskCanceller ==/!= nil, add logging
       self?.__remove_withLock(taskCanceller: taskCanceller)
       // free up memory (Task-shell itself with Success data, AnyCancellable wrapper)
     }
@@ -469,28 +440,27 @@ extension CancellationBag.__TaskCancellationBag {
 
 // ------------------
 
-// Improvement: Remove it when (Unique)OrderedSet from Swift-Collections become part of standard library
-fileprivate typealias OrderedSet<Element> = ContiguousArray<Element>
+/// A hashable identity wrapper around a reference-type `Cancellable`, so storage can
+/// deduplicate instances via `==` (object identity) and hash them via `ObjectIdentifier`.
+fileprivate struct AnyCancellableObj: Hashable {
+  let cancellable: any Cancellable & AnyObject
 
-extension OrderedSet where Element: AnyObject {
-  fileprivate mutating func insert(_ element: Element) {
-    let notContained = allSatisfy { $0 !== element }
-    guard notContained else { return }
-    append(element)
+  init(_ cancellable: any Cancellable & AnyObject) {
+    self.cancellable = cancellable
   }
-  
-  fileprivate mutating func remove(_ element: Element) { removeAll(where: { $0 === element }) }
-}
 
-extension ContiguousArray {
+  @_transparent
+  func cancel() {
+    cancellable.cancel()
+  }
+
   @inlinable
-  internal func _forEach_UsingSpan_(_ body: (Element) -> Void) {
-    let span = self.span
-    let count = span.count
-    var index = 0
-    while index < count {
-      body(span[index])
-      index += 1
-    }
+  static func == (lhs: AnyCancellableObj, rhs: AnyCancellableObj) -> Bool {
+    lhs.cancellable === rhs.cancellable
+  }
+
+  @inlinable
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(cancellable as AnyObject))
   }
 }
