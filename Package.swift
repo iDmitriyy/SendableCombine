@@ -17,10 +17,14 @@ let package = Package(
     .target(name: "CancellationBag", swiftSettings: [
       .enableExperimentalFeature("StaticExclusiveOnly"),
     ]),
+    .target(name: "SendableCombineLogging"),
     .target(name: "CurrentValuePublisher",
             dependencies: ["SendablePublishers"]),
     .target(name: "MainActorPublishers",
-            dependencies: ["SendablePublishers"]),
+            dependencies: [
+              "SendablePublishers",
+              "SendableCombineLogging",
+            ]),
     .target(name: "SendableCombine",
             dependencies: [
               "SendablePublishers",
@@ -35,7 +39,10 @@ let package = Package(
     .testTarget(name: "CurrentValuePublisherTests",
                 dependencies: ["CurrentValuePublisher"]),
     .testTarget(name: "MainActorPublishersTests",
-                dependencies: ["MainActorPublishers"]),
+                dependencies: [
+                  "MainActorPublishers",
+                  "SendableCombineLogging",
+                ]),
     .testTarget(name: "SendableCombineTests",
                 dependencies: ["SendableCombine"]),
   ],

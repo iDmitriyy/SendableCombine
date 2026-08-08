@@ -7,6 +7,7 @@
 
 public import Combine
 import os
+import SendableCombineLogging
 
 // MARK: - Core Driver3 Type
 
@@ -96,7 +97,10 @@ extension Driver {
   /// - Parameters:
   ///   - infallibleUpstream: An existing publisher that is guaranteed never to emit failures (`Failure == Never`).
   ///   - initialValue: The default baseline element emitted upon subscription if the upstream hasn't emitted anything.
-  public init<P: Publisher>(infallibleUpstream: P, initialValue: Element) where P.Output == Element, P.Failure == Never {
+  public init<P: Publisher>(infallibleUpstream: P,
+                            initialValue: Element,
+                            logWhenTerminated: Bool)
+    where P.Output == Element, P.Failure == Never {
     let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
     
     let lazyPublisher = Deferred {
@@ -113,6 +117,9 @@ extension Driver {
         /// 2. Multicast bridges the upstream to the buffer subject.
         /// This ensures the upstream is shared and subscribed to exactly ONCE (subscriptionCount == 1).
         let connectable = infallibleUpstream
+          .handleEvents(receiveCompletion: { completion in
+            Self.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
+          })
           .receive(on: DispatchQueue.main)
           .multicast(subject: bufferSubject)
         
@@ -126,6 +133,94 @@ extension Driver {
     }
     
     self._upstream = lazyPublisher.eraseToAnyPublisher()
+  }
+
+  // MARK: - Init with Infallible Publisher + Diagnostic Logging
+
+  /// Creates a `Driver` from an infallible publisher, same as `init(infallibleUpstream:initialValue:)`,
+  /// but additionally logs a diagnostic when the `initialValue` is silently dropped.
+  ///
+  /// The `initialValue` is dropped when the upstream gets connected (inside a `Deferred` block) before the
+  /// first downstream subscriber attaches: a hot or replay(1) source (`CurrentValueSubject`, `@Published`,
+  /// `Just`, ...) synchronously emits during `connect()`, replacing the buffer's `initialValue` so it is
+  /// never delivered.
+  ///
+  /// This variant detects the drop with a lightweight `handleEvents(receiveOutput:)` tap placed **before**
+  /// `.receive(on: DispatchQueue.main)` — the tap fires synchronously at connection time, when no subscriber
+  /// exists yet — and logs once via the `SendableCombineLogging` observer. It requires no extra `Subject` and no value equality checks.
+  ///
+  /// - Parameters:
+  ///   - infallibleUpstream2: An existing publisher that is guaranteed never to emit failures (`Failure == Never`).
+  ///   - initialValue: The default baseline element emitted upon subscription if the upstream hasn't emitted anything.
+  ///   - logWhenInitialValueDropped: When `true` (default), logs the dropped-initialValue diagnostic once.
+  public init<P: Publisher>(infallibleUpstream2: P,
+                            initialValue: Element,
+                            logWhenInitialValueDropped: Bool) where P.Output == Element, P.Failure == Never {
+    self._upstream = Self.makeLazyInfallibleDriver(
+      infallibleUpstream2,
+      initialValue: initialValue,
+      logWhenInitialValueDropped: logWhenInitialValueDropped
+    )
+  }
+
+  /// Builds the lazily-connected, shared pipeline for `init(infallibleUpstream2:initialValue:logWhenInitialValueDropped:)`.
+  ///
+  /// Kept as a `static` function so the escaping operator closures are not created directly inside the struct's
+  /// initializer (the Swift compiler rejects escaping closures capturing a partially-initialized struct value
+  /// during code generation for a `Publisher`-conforming type).
+  private static func makeLazyInfallibleDriver<P>(_ infallibleUpstream: P,
+                                                  initialValue: Element,
+                                                  logWhenInitialValueDropped: Bool)
+    -> AnyPublisher<Element, Never> where P: Publisher, P.Output == Element, P.Failure == Never {
+    let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
+
+    /// Tiny shared signal only allocated when diagnostic logging is enabled.
+    let dropLock = logWhenInitialValueDropped
+      ? OSAllocatedUnfairLock<(hasSubscriber: Bool, didLog: Bool)>(uncheckedState: (hasSubscriber: false, didLog: false))
+      : nil
+
+    let lazyPublisher = Deferred {
+      lock.withLockUnchecked { state in
+        if let existing = state.publisher {
+          return existing
+        }
+
+        let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
+
+        let connectable = infallibleUpstream
+          .handleEvents(receiveOutput: { value in
+            guard logWhenInitialValueDropped, let dropLock else { return }
+            let shouldLog = dropLock.withLock { signals in
+              guard !signals.didLog, !signals.hasSubscriber else { return false }
+              signals.didLog = true
+              return true
+            }
+            if shouldLog {
+              _log(.warning, SendableCombineLogEntry(
+                code: .driverInitialValueDropped,
+                message: "The initialValue (\(initialValue)) was dropped: the upstream emitted \(value) before the first subscriber attached (the upstream behaves like a hot observable or a replay(1) source). If the upstream is a CurrentValueSubject, prefer the no-argument asDriver(), which replays the subject's current value without an initialValue. If this behaviour is expected, pass logWhenInitialValueDropped: false."
+              ))
+            }
+          })
+          .receive(on: DispatchQueue.main)
+          .multicast(subject: bufferSubject)
+
+        state.cancellable = connectable.connect()
+
+        let shared = connectable
+          .handleEvents(receiveSubscription: { _ in
+            dropLock?.withLock { signals in
+              signals.hasSubscriber = true
+            }
+          })
+          .eraseToAnyPublisher()
+
+        state.publisher = shared
+        return shared
+      }
+    }
+
+    return lazyPublisher.eraseToAnyPublisher()
   }
 }
 
@@ -145,8 +240,13 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
   ///
   /// - Returns: A `Driver` instance.
   public func asDriver() -> Driver<Output> {
-    // FIXME: - not in main thread
-    Driver(_upstream: self.eraseToAnyPublisher())
+    let upstream = self
+      .handleEvents(receiveCompletion: { completion in
+        Driver<Output>.logTerminationDiagnostic(logWhenTerminated: true, completion: completion)
+      })
+      .receive(on: DispatchQueue.main)
+      .eraseToAnyPublisher()
+    return Driver(_upstream: upstream)
   }
 }
 
@@ -167,7 +267,7 @@ extension Publisher where Failure == Never, Output: Sendable {
   ///   if the upstream has not emitted any data yet.
   /// - Returns: A `Driver` instance.
   public func asDriver(initialValue: Output) -> Driver<Output> {
-    Driver(infallibleUpstream: self, initialValue: initialValue)
+    Driver(infallibleUpstream: self, initialValue: initialValue, logWhenTerminated: true)
   }
 }
 
@@ -191,20 +291,11 @@ extension Publisher where Output: Sendable {
   public func asDriverIgnoringError(initialValue: Output, logWhenTerminated: Bool = true) -> Driver<Output> {
     let processed = self
       .handleEvents(receiveCompletion: { completion in
-        guard logWhenTerminated else { return }
-        switch completion {
-        case .finished:
-          let message = "[Driver<\(Output.self)> Warning] Upstream is terminated with COMPLETION. "
-              + "The UI stream is now permanently frozen."
-        case .failure(let error):
-          let message = "[Driver<\(Output.self)> Warning] Upstream terminated with error: \(error). "
-            + "The UI stream is now permanently frozen."
-          break
-        }
+        Driver<Output>.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
       })
       .catch { _ in Empty<Output, Never>() }
 
-    return Driver(infallibleUpstream: processed, initialValue: initialValue)
+    return Driver(infallibleUpstream: processed, initialValue: initialValue, logWhenTerminated: false)
   }
 
   /// Transforms a failable publisher into a driver stream, recovering from errors with a fallback state mapping.
@@ -230,22 +321,35 @@ extension Publisher where Output: Sendable {
                        catchError: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
     let processed = self
       .handleEvents(receiveCompletion: { completion in
-        guard logWhenTerminated else { return }
-        switch completion {
-        case .finished:
-          let message = "[Driver<\(Output.self)> Warning] Upstream is terminated with COMPLETION. "
-            + "The UI stream is now permanently frozen."
-          break
-        case .failure(let error):
-          let message = "[Driver<\(Output.self)> Warning] Upstream terminated with error: \(error). "
-            + "The UI stream is now permanently frozen."
-          break
-        }
+        Driver<Output>.logTerminationDiagnostic(logWhenTerminated: logWhenTerminated, completion: completion)
       })
       .catch { failure in Just(catchError(failure)) }
-
-    // FIXME: - LogError
     
-    return Driver(infallibleUpstream: processed, initialValue: initialValue)
+    return Driver(infallibleUpstream: processed, initialValue: initialValue, logWhenTerminated: false)
+  }
+}
+
+// MARK: - Termination Diagnostic
+
+extension Driver {
+  /// Logs a diagnostic warning when the upstream terminates, so a silent pipeline termination
+  /// (which permanently freezes the UI stream) stays visible during development.
+  ///
+  /// - Parameters:
+  ///   - logWhenTerminated: When `true`, logs the warning; when `false`, does nothing.
+  ///   - completion: The terminal event received from the upstream.
+  @inline(never)
+  fileprivate static func logTerminationDiagnostic<Failure: Error>(
+    logWhenTerminated: Bool,
+    completion: Subscribers.Completion<Failure>
+  ) {
+    guard logWhenTerminated else { return }
+    switch completion {
+    case .finished:
+      _log(.warning, SendableCombineLogEntry(code: .driverUpstreamTerminatedWithCompletion,
+                                             message: "The upstream is terminated with COMPLETION. The UI stream is now permanently frozen."))
+    case .failure(let error):
+      _log(.warning, SendableCombineLogEntry(code: .driverUpstreamTerminatedWithFailure, message: "The upstream terminated with error: \(error). The UI stream is now permanently frozen."))
+    }
   }
 }

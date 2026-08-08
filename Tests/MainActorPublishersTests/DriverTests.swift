@@ -171,6 +171,29 @@ struct DriverTests {
     }
   }
 
+  // MARK: - Conversion Tests
+
+  @Suite("testErasedAsDriver_CurrentValueSubject")
+  struct ErasedCurrentValueSubjectAsDriver {
+    @Test("CurrentValueSubject erased to any Publisher<Int, Never> converts to Driver")
+    func convertsErasedCurrentValueSubject() async throws {
+      guard #available(anyAppleOS 26.0, *) else { return }
+
+      let subject = CurrentValueSubject<Int, Never>(0)
+      let erased: any Publisher<Int, Never> = subject.eraseToAnyPublisher()
+      let driver = erased.asDriver(initialValue: 1)
+
+      let task = collectValues(publisher: driver, expectedCount: 3, timeout: .milliseconds(10))
+
+      subject.send(2)
+      subject.send(3)
+
+      let results = try await task.value
+      _debugPrintDate(prefix: "____ awaited results")
+      #expect(results == [0, 2, 3])
+    }
+  }
+
 //  @Suite("testDriverSharing_WhenCompleted")
 //  struct SharingWhenCompleted {
 //    @Test("shares single subscription across multiple observers and completes")
