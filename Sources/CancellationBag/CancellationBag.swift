@@ -274,8 +274,6 @@ public struct CancellationBag: ~Copyable, Sendable {
 
 // ══════════════════════════════════════════════════════════════════════════════
 
-//public import Foundation
-
 extension CancellationBag {
   /// returns `nil` if `TaskCancellationBag` in disposed state.
   private func __taskBag_withLock() -> __TaskCancellationBag? {

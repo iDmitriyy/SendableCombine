@@ -10,7 +10,11 @@ func _logTerminationDiagnostic<Failure: Error>(
   guard logWhenTerminated else { return }
   
   let prefix = "The \(publisherName) " + "upstream terminated with "
-  let suffix = "The shared event stream is now permanently closed – no further events will be delivered."
+  let suffix = "The shared event stream is now permanently closed – no further events will be delivered. "
+    + "Typically it is not what you want for shared UI streams."
+    + "Check upstream owner is alive and don't let the upstream complete or fail prematurely. "
+    + "If termination is expected, handle it in upstream with catchError / replaceError / catch; "
+    + "otherwise suppress this warning with logWhenTerminated: false."
   
   let message: String
   switch completion {
