@@ -140,8 +140,11 @@ public struct CancellationBag: ~Copyable, Sendable {
       cancellable.cancel()
     }
     
-    toCancel.cancellableExistentials._forEach_UsingSpan_ { cancellable in
-      cancellable.cancel()
+    do {
+      let span = toCancel.cancellableExistentials.span
+      for index in span.indices {
+        span[index].cancel()
+      }
     }
     
     toCancel.tasksToCancel.forEach { cancellable in
@@ -210,7 +213,7 @@ public struct CancellationBag: ~Copyable, Sendable {
         return anyCancellableObjects
       } else {
         let wrapped = anyCancellableObjects.map { AnyCancellableObj($0 as any Cancellable & AnyObject) }
-        storage.cancellableObjects.insert(contentsOf: wrapped)
+        storage.cancellableObjects.formUnion(wrapped)
         return nil
       }
     }
@@ -312,14 +315,14 @@ extension CancellationBag {
       __storage = OSAllocatedUnfairLock(uncheckedState: (tasks: Set(), isDisposed: false))
     }
 
-    deinit {} // Tasks are cancelled by `CancellationBag` in deinit
+    // deinit {} // Tasks are cancelled by `CancellationBag` in its deinit
 
     fileprivate final func __setDisposed_AndConsumeStorage_withLock()
-      -> sending OrderedSet<any Cancellable & AnyObject> {
+      -> sending Set<AnyCancellableObj> {
       __storage.withLockUnchecked { storage in
         storage.isDisposed = true
         let tasksToCancel = storage.tasks
-        storage.tasks = OrderedSet()
+        storage.tasks = Set()
         return tasksToCancel
       }
     }
@@ -330,7 +333,7 @@ extension CancellationBag {
       let inserted: Bool = __storage.withLockUnchecked { storage in
         guard !storage.isDisposed else { return false }
         
-        storage.tasks.insert(taskCanceller)
+        storage.tasks.insert(AnyCancellableObj(taskCanceller))
         return true
       }
       
@@ -344,11 +347,11 @@ extension CancellationBag {
       __storage.withLockUnchecked { storage -> Void in
         guard !storage.isDisposed else { return }
         
-        storage.tasks.remove(taskCanceller)
+        storage.tasks.remove(AnyCancellableObj(taskCanceller))
       }
     }
 
-    private typealias Storage = (tasks: OrderedSet<any Cancellable & AnyObject>, isDisposed: Bool)
+    private typealias Storage = (tasks: Set<AnyCancellableObj>, isDisposed: Bool)
   }
 }
 
@@ -369,6 +372,7 @@ extension CancellationBag.__TaskCancellationBag {
       guard let taskCanceller else { return }
       // if self == nil or taskCancellable == nil then task was cancelled on bag disposal
       // otherwise clean up resources if bag was not yet disposed / deinited
+      // TODO: - cover all branched if self ==/!= nil + taskCanceller ==/!= nil, add logging
       self?.__remove_withLock(taskCanceller: taskCanceller)
       // free up memory (Task-shell itself with Success data, AnyCancellable wrapper)
     }
@@ -452,24 +456,13 @@ fileprivate struct AnyCancellableObj: Hashable {
     cancellable.cancel()
   }
 
+  @inlinable
   static func == (lhs: AnyCancellableObj, rhs: AnyCancellableObj) -> Bool {
     lhs.cancellable === rhs.cancellable
   }
 
+  @inlinable
   func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(cancellable as AnyObject))
-  }
-}
-
-extension ContiguousArray {
-  @_transparent
-  internal func _forEach_UsingSpan_(_ body: (Element) -> Void) {
-    let span = self.span
-    let count = span.count
-    var index = 0
-    while index < count {
-      body(span[index])
-      index += 1
-    }
   }
 }
