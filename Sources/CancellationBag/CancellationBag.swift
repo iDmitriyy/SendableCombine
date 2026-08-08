@@ -174,19 +174,21 @@ public struct CancellationBag: ~Copyable, Sendable {
   // MARK: - Insert single Cancellable
 
   public func insert(_ cancellableObject: AnyCancellable) {
-    __insert_withLock(object: cancellableObject)?.cancel() // Cancel outside the lock to prevent reentrancy
-  }
-
-  private func __insert_withLock(object: AnyCancellable) -> AnyCancellable? {
-    __storage.withLockUnchecked { storage in
+//    __insert_withLock(object: cancellableObject)?.cancel() // Cancel outside the lock to prevent reentrancy
+    
+    __storage.withLockUnchecked { storage -> AnyCancellable? in
       if storage.isDisposed {
-        return object
+        return cancellableObject
       } else {
-        storage.cancellableObjects.append(object)
+        storage.cancellableObjects.append(cancellableObject)
         return nil
       }
-    }
+    }?.cancel()
   }
+
+//  private func __insert_withLock(object: AnyCancellable) -> AnyCancellable? {
+//    
+//  }
 
   public func insert(_ cancellable: any Cancellable) {
     if let cancellableObject = cancellable as? AnyCancellable {
