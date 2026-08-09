@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "SendableCombine"
                BuildableName = "SendableCombine"
+               BlueprintName = "SendableCombine"
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
@@ -35,6 +36,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "SendableCombineTests"
                BuildableName = "SendableCombineTests"
+               BlueprintName = "SendableCombineTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>
@@ -63,6 +65,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "SendableCombine"
             BuildableName = "SendableCombine"
+            BlueprintName = "SendableCombine"
             ReferencedContainer = "container:">
          </BuildableReference>
       </MacroExpansion>

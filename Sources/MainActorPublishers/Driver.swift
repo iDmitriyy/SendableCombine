@@ -51,7 +51,7 @@ import SendableCombineLogging
 /// ensuring visibility into unexpected pipeline terminations.
 public struct Driver<Element: Sendable> {
   @usableFromInline internal let _upstream: AnyPublisher<Element, Never>
-} // FXIME: .onCompleted ?
+} // FXIME: .onCompleted on deinit?
 
 // MARK: - Sendable
 

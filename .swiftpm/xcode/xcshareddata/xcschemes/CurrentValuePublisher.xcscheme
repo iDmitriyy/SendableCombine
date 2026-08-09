@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "CurrentValuePublisher"
                BuildableName = "CurrentValuePublisher"
+               BlueprintName = "CurrentValuePublisher"
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
@@ -52,6 +53,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CurrentValuePublisher"
             BuildableName = "CurrentValuePublisher"
+            BlueprintName = "CurrentValuePublisher"
             ReferencedContainer = "container:">
          </BuildableReference>
       </MacroExpansion>

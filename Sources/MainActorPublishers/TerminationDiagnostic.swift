@@ -1,3 +1,9 @@
+//  TerminationDiagnostic.swift
+//  SendablePublishers
+//
+//  Created by Dmitriy Ignatyev on 05.08.2026.
+//
+
 import Combine
 import SendableCombineLogging
 

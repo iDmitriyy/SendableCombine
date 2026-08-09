@@ -10,6 +10,7 @@ public import Combine
 
 // MARK: - InfallibleValuePublisher
 
+// FIXME: - Make it conditionaly Sendable when Output: Sendable
 public typealias AnyInfallibleValuePublisher<Output> = AnyCurrentValuePublisher<Output, Never>
 
 //===-------------------------------------------------------------------------------------------------------------------===//
