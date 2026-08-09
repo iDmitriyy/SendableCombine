@@ -91,6 +91,7 @@ extension Driver {
 // MARK: - as Publisher
 
 extension Driver {
+  @_transparent
   public func asPublisher() -> AnyPublisher<Element, Never> {
     _upstream
   }
@@ -120,10 +121,10 @@ extension Driver {
   /// - Parameters:
   ///   - infallibleUpstream: An existing publisher that is guaranteed never to emit failures (`Failure == Never`).
   ///   - initialValue: The default baseline element emitted upon subscription if the upstream hasn't emitted anything.
-  public init<P: Publisher>(infallibleUpstream: P,
+  @inline(never)
+  internal init<P: Publisher>(infallibleUpstream: P,
                             initialValue: Element,
-                            logWhenTerminated: Bool)
-    where P.Output == Element, P.Failure == Never {
+                            logWhenTerminated: Bool) where P.Output == Element, P.Failure == Never {
     let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
 
     let lazyPublisher = Deferred {
@@ -144,7 +145,7 @@ extension Driver {
           let connectable = infallible
             .multicast(subject: bufferSubject)
 
-          // 3. Atomically connect to the upstream. Demand tracking flows natively via internal Combine mechanisms.
+          // 3. Atomically connect to the upstream. Demand tracking flows via internal Combine mechanisms.
           state.cancellable = connectable.connect()
 
           /// 4. Re-schedule the shared stream onto the main queue **downstream** of the buffer.
