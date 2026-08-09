@@ -257,6 +257,8 @@ public struct CancellationBag: ~Copyable, Sendable {
                                        cancellableExistentials: ContiguousArray<any Cancellable>,
                                        tasksToCancel: Set<AnyCancellableObj>)
   
+  // MARK: - Storage
+  
   // TODO: ?make Storage ~Copyable.
   // Also deinit does not need withLock – we can access data directly. But if Storage is moveOnly, then
   // it is needed to be extracted from Mutex. Mutex need to be consumed in deinit which is not possible yet.
@@ -445,6 +447,7 @@ extension CancellationBag.__TaskCancellationBag {
 fileprivate struct AnyCancellableObj: Hashable {
   let cancellable: any Cancellable & AnyObject
 
+  @_transparent
   init(_ cancellable: any Cancellable & AnyObject) {
     self.cancellable = cancellable
   }
