@@ -84,6 +84,8 @@ extension Driver {
       MainActor.assumeIsolated {
         receiveValue(value)
       }
+      // TODO: check binary size in target binary with with inlining variants and without for 20 calls of
+      // different `Driver<Element>` type.
     })
   }
 }
@@ -91,7 +93,7 @@ extension Driver {
 // MARK: - as Publisher
 
 extension Driver {
-  @_transparent
+  @export(implementation) @_transparent
   public func asPublisher() -> AnyPublisher<Element, Never> {
     _upstream
   }
@@ -231,6 +233,8 @@ extension Driver {
 
         let connectable = infallibleUpstream
           .handleEvents(receiveOutput: { value in
+            // even if logWhenInitialValueDropped == true,performing handleEvents(receiveOutput:) on each
+            // emission is unneeded.
             guard logWhenInitialValueDropped, let dropLock else { return }
             let shouldLog = dropLock.withLock { signals in
               guard !signals.didLog, !signals.hasSubscriber else { return false }
@@ -245,6 +249,11 @@ extension Driver {
             }
           })
           .multicast(subject: bufferSubject)
+        
+        let checkInitialValueDrop = connectable.handleEvents().sink { output in
+          // 1) log; 2) remove subscription
+          // TODO: can it be done this way?
+        }
 
         state.cancellable = connectable.connect()
 
