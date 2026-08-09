@@ -152,6 +152,7 @@ public struct CancellationBag: ~Copyable, Sendable {
     }
   }
   
+  @inline(always)
   private func __setDisposed_AndConsumeStorage_withLock() -> sending ConsumedStorage {
     __storage.withLockUnchecked { storage -> sending ConsumedStorage in
       storage.isDisposed = true
@@ -163,7 +164,9 @@ public struct CancellationBag: ~Copyable, Sendable {
       } else {
         tasksToCancel = Set()
       }
-      
+      // TODO: may be just return (ConsumedStorage, tasksToCancel)
+      // in here: only make storage.cancellableObjects & cancellableValueTypeExistentials empty)
+      // taskCancellationBag = nil
       let cancellableObjects = storage.cancellableObjects
       let cancellableExistentials = storage.cancellableValueTypeExistentials
       
@@ -192,16 +195,16 @@ public struct CancellationBag: ~Copyable, Sendable {
       // Reference type: deduplicated by identity and inserted once
       insert(cancellableObject)
     } else {
-      // Value type: each insert stores a fresh copy, so duplicates are allowed.
-      // Cancel outside the lock to prevent reentrancy.
       __storage.withLockUnchecked { storage -> (any Cancellable)? in
         if storage.isDisposed {
           return cancellable
         } else {
+          // Value type: each insert stores a copy, so duplicates are value-type duplicates inserted twice.
           storage.cancellableValueTypeExistentials.append(cancellable)
           return nil
         }
       }?.cancel()
+      // Cancel outside the lock to prevent reentrancy.
     }
   }
 
@@ -217,10 +220,14 @@ public struct CancellationBag: ~Copyable, Sendable {
         return nil
       }
     }
-
+    
     // Cancel outside the lock to prevent reentrancy
     toCancel?.forEach { $0.cancel() }
-    // FIXME: - C: Collection can contain same object twice. Need to make `toCancel` unique, add text
+    // FIXME: - C: Collection can contain same object twice. Need to make `toCancel` unique, add test
+    // FIXME: reuse common func for insertion single and many.
+    // May be make in generic for (any Cancellable) & (any Cancellable & AnyObject) and check P.Self is
+    // is AnyObject, check bin size. Or @specialize
+    // private static func __unprotected_insert<T: AnyCancellable>(_ cancellable: T, to: inout Storage) {}
   }
   
   public func insert(_ cancellables: some Collection<any Cancellable>) {
@@ -230,8 +237,12 @@ public struct CancellationBag: ~Copyable, Sendable {
     // Split reference-type vs value-type Cancellables
     for cancellable in cancellables {
       if let cancellableObject = cancellable as? any Cancellable & AnyObject {
+        // TODO: do not store them as existential. Cast to generic type and then use
+        // __unprotected_insert
         cancellableObjects.append(cancellableObject)
       } else {
+        // TODO: do not copy Existentials, just store their indices
+        // Make all current todo's list and add unit tests.
         cancellableValueTypeExistentials.append(cancellable)
       }
     }
@@ -297,10 +308,27 @@ extension CancellationBag {
   
   public func withCancellationOnBagDisposal<Success, Failure>(insert task: Task<Success, Failure>) {
     // taskBag is nil if `CancellationBag` was disposed.
-    if let taskBag = __taskBag_withLock() {
-      taskBag.__withCancellationOnBagDisposal(insert: task)
-    } else {
+    guard let taskBag = __taskBag_withLock() else {
       task.cancel()
+      return
+    }
+    
+    let taskCanceller = AnyCancellable {
+      task.cancel()
+    }
+
+    guard taskBag.__insertOrCancel_withLock(taskCanceller: taskCanceller) else { return }
+
+    Task(priority: .low) { [weak taskBag, weak taskCanceller] in
+      // taskCanceller is weak because only CancellationBag should retain it.
+      _ = await task.result
+
+      guard let taskCanceller else { return }
+      // if self == nil or taskCancellable == nil then task was cancelled on bag disposal
+      // otherwise clean up resources if bag was not yet disposed / deinited
+      // TODO: - cover all branched if self ==/!= nil + taskCanceller ==/!= nil, add logging
+      taskBag?.__remove_withLock(taskCanceller: taskCanceller)
+      // free up memory (Task-shell itself with Success data, AnyCancellable wrapper)
     }
   }
 }
@@ -312,12 +340,12 @@ extension CancellationBag {
   fileprivate final class __TaskCancellationBag: Sendable {
     private let __storage: OSAllocatedUnfairLock<Storage>
 
-    internal init() {
+    fileprivate init() {
       __storage = OSAllocatedUnfairLock(uncheckedState: (tasks: Set(), isDisposed: false))
     }
 
     // deinit {} // Tasks are cancelled by `CancellationBag` in its deinit
-
+    
     fileprivate final func __setDisposed_AndConsumeStorage_withLock() -> sending Set<AnyCancellableObj> {
       __storage.withLockUnchecked { storage in
         storage.isDisposed = true
@@ -329,7 +357,7 @@ extension CancellationBag {
 
     // MARK: - Insert / Remove
 
-    private final func __insertOrCancel_withLock(taskCanceller: AnyCancellable) -> Bool {
+    fileprivate final func __insertOrCancel_withLock(taskCanceller: AnyCancellable) -> Bool {
       let inserted: Bool = __storage.withLockUnchecked { storage in
         guard !storage.isDisposed else { return false }
         
@@ -343,7 +371,7 @@ extension CancellationBag {
       return inserted
     }
 
-    private final func __remove_withLock(taskCanceller: AnyCancellable) {
+    fileprivate final func __remove_withLock(taskCanceller: AnyCancellable) {
       __storage.withLockUnchecked { storage -> Void in
         guard !storage.isDisposed else { return }
         
@@ -355,55 +383,26 @@ extension CancellationBag {
   }
 }
 
-// MARK: - CancellationBag + Swift.Task
-
-extension CancellationBag.__TaskCancellationBag {
-  fileprivate final func __withCancellationOnBagDisposal(insert task: Task<some Any, some Any>) {
-    let taskCanceller = AnyCancellable {
-      task.cancel()
-    }
-
-    guard __insertOrCancel_withLock(taskCanceller: taskCanceller) else { return }
-
-    Task(priority: .low) { [weak self, weak taskCanceller] in
-      // taskCanceller is weak because only CancellationBag should store it.
-      _ = await task.result
-
-      guard let taskCanceller else { return }
-      // if self == nil or taskCancellable == nil then task was cancelled on bag disposal
-      // otherwise clean up resources if bag was not yet disposed / deinited
-      // TODO: - cover all branched if self ==/!= nil + taskCanceller ==/!= nil, add logging
-      self?.__remove_withLock(taskCanceller: taskCanceller)
-      // free up memory (Task-shell itself with Success data, AnyCancellable wrapper)
-    }
-  }
-}
-
 //// MARK: - CancellationBag + URLSessionDataTask
 
 public import Foundation
 import Synchronization
 
 extension CancellationBag {
-  public func withCancellationOnBagDisposal(insert dataTask: URLSessionDataTask) {
-    if let taskBag = __taskBag_withLock() {
-      taskBag.__withCancellationOnBagDisposal(insert: dataTask)
-    } else {
-      dataTask.cancel()
-    }
-  }
-}
-
-extension CancellationBag.__TaskCancellationBag {
   /// Cancel URLSessionDataTask on `CancellationBag` disposal.
-  fileprivate final func __withCancellationOnBagDisposal(insert dataTask: URLSessionDataTask) {
+  public func withCancellationOnBagDisposal(insert dataTask: URLSessionDataTask) {
+    guard let taskBag = __taskBag_withLock() else {
+      dataTask.cancel()
+      return
+    }
+    
     let taskCanceller = AnyCancellable {
       dataTask.cancel()
     }
 
-    guard __insertOrCancel_withLock(taskCanceller: taskCanceller) else { return }
+    guard taskBag.__insertOrCancel_withLock(taskCanceller: taskCanceller) else { return }
 
-    Task(priority: .low) { [weak self, weak taskCanceller] in
+    Task(priority: .low) { [weak taskBag, weak taskCanceller] in
       var observation: NSKeyValueObservation?
       let wasResumed = Mutex(false)
       await withCheckedContinuation { continuation in
@@ -435,8 +434,8 @@ extension CancellationBag.__TaskCancellationBag {
 
       guard let taskCanceller else { return }
       _ = consume observation
-      self?.__remove_withLock(taskCanceller: taskCanceller)
-    }
+      taskBag?.__remove_withLock(taskCanceller: taskCanceller)
+    } // end Task(priority: .low)
   }
 }
 
