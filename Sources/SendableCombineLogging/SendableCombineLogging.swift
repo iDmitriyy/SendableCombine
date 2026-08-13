@@ -76,7 +76,7 @@ package enum SendableCombineLogging {
           return nil
         }
       }
-    
+
     if let (existingObserver, newObserver) = conflict {
       let entry = SendableCombineLogEntry(code: .loggingObserverReinjection,
                                           message: "Trying to inject a logging observer more than once.")
@@ -94,11 +94,26 @@ package enum SendableCombineLogging {
       }
     }
   #endif
+
+  #if DEBUG
+    private static let subsystem = "sdk.SendableCombine"
+    private static let category = "General"
+
+    fileprivate static let debugLogger = Logger(subsystem: subsystem, category: category)
+  #endif
 }
 
 // MARK: - Logging
 
 package func _log(_ level: SendableCombineLogLevel, _ entry: SendableCombineLogEntry) {
+  #if DEBUG
+    let osLogLevel: OSLogType = switch level {
+    case .warning: .error
+    case .critical: .fault
+    }
+    SendableCombineLogging.debugLogger.log(level: osLogLevel, "\(entry.message)")
+  #endif
+
   let logger = SendableCombineLogging._observer.withLockUnchecked { $0 }
   logger?((level: level, entry: entry))
 }

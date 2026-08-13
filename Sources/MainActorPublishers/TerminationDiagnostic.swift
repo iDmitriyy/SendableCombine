@@ -8,7 +8,7 @@ import Combine
 import SendableCombineLogging
 
 @inline(never)
-func _logTerminationDiagnostic<Failure: Error>(
+internal func _logTerminationDiagnostic<Failure: Error>(
   logWhenTerminated: Bool,
   sharedPublisherName: String,
   completion: Subscribers.Completion<Failure>
