@@ -18,8 +18,8 @@ import SendableCombineLogging
 /// and ensures that any new subscriber immediately retrieves the current state of the stream.
 ///
 /// - Note: This publisher enforces three critical constraints:
-///   1. **Infallible**: It cannot emit error termination signals (`Failure == Never`).
-///   2. **Main Thread**: All downstream values are guaranteed to be observed on the main queue.
+///   1. **Infallible**: It cannot emit error termination signal (`Failure == Never`).
+///   2. **Main Thread**: All downstream values are guaranteed to be observed on the main thread.
 ///   3. **Replay**: Replays the latest element upon subscription:
 ///   either the `initialValue` if no data has arrived yet from upstream, or the most recent upstream emission.
 ///
@@ -34,12 +34,12 @@ import SendableCombineLogging
 /// Apple Combine's `Subscribers.Demand` contract. Data flow is throttled natively according to consumer consumption speeds.
 ///
 /// ### Replay Semantics (3 examples)
-/// * **Case 1**: Subscriber 1 receives `initialValue`. Upstream generates no events. Subscriber 2 appears and also receives `initialValue`.
-/// * **Case 2**: Subscriber 1 receives `initialValue`. Then upstream emits `nextValue`, and Subscriber 1 receives `nextValue`.
-/// Subscriber 2 appears and receives `nextValue`.
+/// * **Case 1**: `Subscriber 1` receives `initialValue`. Upstream generates no events. `Subscriber 2` appears and also receives `initialValue`.
+/// * **Case 2**: `Subscriber 1` receives `initialValue`. Then upstream emits `nextValue`, and `Subscriber 1` receives `nextValue`.
+/// `Subscriber 2` appears and receives `nextValue`.
 /// * **Case 3**: `Driver` is created with `initialValue`. While there are no subscribers yet, upstream emits `nextValue`.
-/// Subscriber 1 appears and receives `nextValue`.
-/// Subscriber 2 appears and receives `nextValue`.
+/// `Subscriber 1` appears and receives `nextValue`.
+/// `Subscriber 2` appears and receives `nextValue`.
 ///
 /// ### Diagnostic Logging & UI Lifecycle
 /// Because a `Driver` is designed to continuously stream data to UI, any upstream termination, whether a normal completion (`.finished`)
