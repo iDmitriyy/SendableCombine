@@ -166,7 +166,7 @@ extension Driver {
           let withTerminationDiagnostic = infallibleUpstream
             .handleEvents(receiveCompletion: { completion in
               _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                        publisherName: "Driver<\(Output.self)>",
+                                        sharedPublisherName: "Driver<\(Output.self)>",
                                         completion: completion)
             })
           return makeMainActorSharedStream(from: withTerminationDiagnostic)
@@ -296,7 +296,7 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
     if logWhenTerminated {
       let upstream = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  publisherName: "Driver<\(Output.self)>",
+                                  sharedPublisherName: "Driver<\(Output.self)>",
                                   completion: completion)
       })
       .receive(on: DispatchQueue.main)
@@ -357,7 +357,7 @@ extension Publisher where Output: Sendable {
     if logWhenTerminated {
       let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  publisherName: "Driver<\(Output.self)>",
+                                  sharedPublisherName: "Driver<\(Output.self)>",
                                   completion: completion)
       })
       return makeDriver(failableSource: withTerminationDiagnostic)
@@ -395,7 +395,7 @@ extension Publisher where Output: Sendable {
     if logWhenTerminated {
       let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  publisherName: "Driver<\(Output.self)>",
+                                  sharedPublisherName: "Driver<\(Output.self)>",
                                   completion: completion)
       })
       return makeDriver(failableSource: withTerminationDiagnostic)

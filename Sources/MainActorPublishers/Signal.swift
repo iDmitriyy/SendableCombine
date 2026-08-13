@@ -131,7 +131,7 @@ extension Signal {
     if logWhenTerminated {
       let withTerminationDiagnostic = infallibleUpstream.handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  publisherName: "Signal<\(Output.self)>",
+                                  sharedPublisherName: "Signal<\(Output.self)>",
                                   completion: completion)
       })
       _upstream = makeSignal(withTerminationDiagnostic)
@@ -169,7 +169,7 @@ extension Publisher where Output: Sendable {
     if logWhenTerminated {
       let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  publisherName: "Signal<\(Output.self)>",
+                                  sharedPublisherName: "Signal<\(Output.self)>",
                                   completion: completion)
       })
       return makeSignal(withTerminationDiagnostic)
@@ -189,7 +189,7 @@ extension Publisher where Output: Sendable {
     if logWhenTerminated {
       let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  publisherName: "Signal<\(Output.self)>",
+                                  sharedPublisherName: "Signal<\(Output.self)>",
                                   completion: completion)
       })
       return makeSignal(failableSource: withTerminationDiagnostic)

@@ -10,12 +10,12 @@ import SendableCombineLogging
 @inline(never)
 func _logTerminationDiagnostic<Failure: Error>(
   logWhenTerminated: Bool,
-  publisherName: String,
+  sharedPublisherName: String,
   completion: Subscribers.Completion<Failure>
 ) {
   guard logWhenTerminated else { return }
   
-  let prefix = "The \(publisherName) " + "upstream terminated with "
+  let prefix = "The \(sharedPublisherName) " + "upstream terminated with "
   let suffix = "The shared event stream is now permanently closed – no further events will be delivered. "
     + "Typically it is not what you want for shared UI streams."
     + "Check upstream owner is alive and don't let the upstream complete or fail prematurely. "

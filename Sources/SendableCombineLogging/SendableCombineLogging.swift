@@ -64,7 +64,7 @@ public typealias SendableCombineLoggingObserver =
   @Sendable ((level: SendableCombineLogLevel, entry: SendableCombineLogEntry)) -> Void
 
 package enum SendableCombineLogging {
-  fileprivate static let _observer = OSAllocatedUnfairLock<SendableCombineLoggingObserver?>(uncheckedState: nil)
+  fileprivate static let _observer = OSAllocatedUnfairLock<SendableCombineLoggingObserver?>(initialState: nil)
 
   public static func injectOnce(loggingObserver: sending @escaping SendableCombineLoggingObserver) {
     let conflict = _observer
@@ -76,7 +76,7 @@ package enum SendableCombineLogging {
           return nil
         }
       }
-
+    
     if let (existingObserver, newObserver) = conflict {
       let entry = SendableCombineLogEntry(code: .loggingObserverReinjection,
                                           message: "Trying to inject a logging observer more than once.")
@@ -101,9 +101,4 @@ package enum SendableCombineLogging {
 package func _log(_ level: SendableCombineLogLevel, _ entry: SendableCombineLogEntry) {
   let logger = SendableCombineLogging._observer.withLockUnchecked { $0 }
   logger?((level: level, entry: entry))
-
-  if level == .critical {
-    let message = "SendableCombine error – code: \(entry.code) (\(entry.codeString)), message: \(entry.message)"
-    assertionFailure(message)
-  }
 }
