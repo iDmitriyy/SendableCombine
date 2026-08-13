@@ -14,7 +14,7 @@ extension SendableShell {
                                   scheduler: S, options: S.SchedulerOptions? = nil)
     -> SendableShell<Publishers.Delay<Upstream, S>> {
     let delay = _base.delay(for: interval, scheduler: scheduler)
-    return SendableShell<Publishers.Delay<Upstream, S>>(_unverified_SendablePublisher__: delay)
+    return SendableShell<Publishers.Delay<Upstream, S>>(_manuallyProven_Sendable__: delay)
   }
 }
 
@@ -28,7 +28,7 @@ extension SendableShell {
     options: S.SchedulerOptions? = nil
   ) -> SendableShell<Publishers.Debounce<Upstream, S>> {
     let debounced = Publishers.Debounce(upstream: self._base, dueTime: dueTime, scheduler: scheduler, options: options)
-    return SendableShell<Publishers.Debounce<Upstream, S>>(_unverified_SendablePublisher__: debounced)
+    return SendableShell<Publishers.Debounce<Upstream, S>>(_manuallyProven_Sendable__: debounced)
   }
   
   @export(implementation)
@@ -38,7 +38,7 @@ extension SendableShell {
     latest: Bool
   ) -> SendableShell<Publishers.Throttle<Upstream, S>> {
     let throttled = Publishers.Throttle(upstream: self._base, interval: interval, scheduler: scheduler, latest: latest)
-    return SendableShell<Publishers.Throttle<Upstream, S>>(_unverified_SendablePublisher__: throttled)
+    return SendableShell<Publishers.Throttle<Upstream, S>>(_manuallyProven_Sendable__: throttled)
   }
 }
 
@@ -57,7 +57,7 @@ extension SendableShell {
                                      scheduler: scheduler,
                                      options: options,
                                      customError: customError)
-    return SendableShell<Publishers.Timeout<Upstream, S>>(_unverified_SendablePublisher__: timeout)
+    return SendableShell<Publishers.Timeout<Upstream, S>>(_manuallyProven_Sendable__: timeout)
   }
 }
 
@@ -70,7 +70,7 @@ extension SendableShell {
     options: S.SchedulerOptions? = nil
   ) -> SendableShell<Publishers.MeasureInterval<Upstream, S>> {
     let measured = _base.measureInterval(using: scheduler, options: options)
-    return SendableShell<Publishers.MeasureInterval<Upstream, S>>(_unverified_SendablePublisher__: measured)
+    return SendableShell<Publishers.MeasureInterval<Upstream, S>>(_manuallyProven_Sendable__: measured)
   }
 }
 

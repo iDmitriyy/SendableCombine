@@ -12,7 +12,7 @@ extension SendableShell {
     options: S.SchedulerOptions? = nil,
   ) -> SendableShell<Publishers.ReceiveOn<Upstream, S>> {
     let received = Publishers.ReceiveOn(upstream: _base, scheduler: scheduler, options: options)
-    return SendableShell<Publishers.ReceiveOn<Upstream, S>>(_unverified_SendablePublisher__: received)
+    return SendableShell<Publishers.ReceiveOn<Upstream, S>>(_manuallyProven_Sendable__: received)
   }
 
   @export(implementation)
@@ -20,6 +20,6 @@ extension SendableShell {
                                                  options: S.SchedulerOptions? = nil)
     -> SendableShell<Publishers.SubscribeOn<Upstream, S>> {
     let subscribed = Publishers.SubscribeOn(upstream: _base, scheduler: scheduler, options: options)
-    return SendableShell<Publishers.SubscribeOn<Upstream, S>>(_unverified_SendablePublisher__: subscribed)
+    return SendableShell<Publishers.SubscribeOn<Upstream, S>>(_manuallyProven_Sendable__: subscribed)
   }
 }

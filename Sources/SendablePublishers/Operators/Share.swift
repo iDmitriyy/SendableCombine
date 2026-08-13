@@ -9,6 +9,6 @@ extension SendableShell {
   @export(implementation)
   public func share() -> SendableShell<Publishers.Share<Upstream>> {
     let shared = Publishers.Share(upstream: _base)
-    return SendableShell<Publishers.Share<Upstream>>(_unverified_SendablePublisher__: shared)
+    return SendableShell<Publishers.Share<Upstream>>(_manuallyProven_Sendable__: shared)
   }
 }

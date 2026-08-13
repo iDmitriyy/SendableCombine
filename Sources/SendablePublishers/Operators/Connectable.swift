@@ -11,7 +11,7 @@ extension SendableShell {
     _ createSubject: @escaping () -> S,
   ) -> SendableShell<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
     let multicast = Publishers.Multicast(upstream: _base, createSubject: createSubject)
-    return SendableShell<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
+    return SendableShell<Publishers.Multicast<Upstream, S>>(_manuallyProven_Sendable__: multicast)
   }
 
   @export(implementation)
@@ -19,7 +19,7 @@ extension SendableShell {
     subject: S,
   ) -> SendableShell<Publishers.Multicast<Upstream, S>> where S.Output == Output, S.Failure == Failure {
     let multicast = _base.multicast(subject: subject)
-    return SendableShell<Publishers.Multicast<Upstream, S>>(_unverified_SendablePublisher__: multicast)
+    return SendableShell<Publishers.Multicast<Upstream, S>>(_manuallyProven_Sendable__: multicast)
   }
 
   @export(implementation)

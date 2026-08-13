@@ -20,7 +20,7 @@ extension SendableShell {
                                           receiveCompletion: receiveCompletion,
                                           receiveCancel: receiveCancel,
                                           receiveRequest: receiveRequest)
-    return SendableShell<Publishers.HandleEvents<Upstream>>(_unverified_SendablePublisher__: handled)
+    return SendableShell<Publishers.HandleEvents<Upstream>>(_manuallyProven_Sendable__: handled)
   }
 }
 
@@ -52,6 +52,6 @@ extension SendableShell {
     to stream: (any TextOutputStream)? = nil,
   ) -> SendableShell<Publishers.Print<Upstream>> {
     let printed = Publishers.Print(upstream: self._base, prefix: prefix, to: stream)
-    return SendableShell<Publishers.Print<Upstream>>(_unverified_SendablePublisher__: printed)
+    return SendableShell<Publishers.Print<Upstream>>(_manuallyProven_Sendable__: printed)
   }
 }

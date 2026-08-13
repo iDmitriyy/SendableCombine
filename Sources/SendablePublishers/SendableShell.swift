@@ -14,13 +14,8 @@ public struct SendableShell<Upstream: Publisher>: Publisher & CustomStringConver
   internal let _base: Upstream
 
   @export(implementation)
-  internal init(_unverified_SendablePublisher__ publisher: Upstream) {
+  internal init(_manuallyProven_Sendable__ publisher: Upstream) {
     _base = publisher
-  }
-
-  @export(implementation)
-  internal init(sendablePublisher: Upstream) {
-    _base = sendablePublisher
   }
 
   @export(implementation)
@@ -35,6 +30,13 @@ public struct SendableShell<Upstream: Publisher>: Publisher & CustomStringConver
 
   public var description: String {
     "SendableShell<\(Upstream.self)>"
+  }
+}
+
+extension SendableShell where Upstream: Sendable {
+  @export(implementation)
+  internal init(sendablePublisher: Upstream) {
+    _base = sendablePublisher
   }
 }
 
@@ -65,7 +67,7 @@ extension SendableShell {
 
   @_spi(ExtensionsUnsafeAPI)
   @export(implementation)
-  public init(unverified_SendablePublisher publisher: Upstream) {
-    self.init(_unverified_SendablePublisher__: publisher)
+  public init(manuallyProven_Sendable publisher: Upstream) {
+    self.init(_manuallyProven_Sendable__: publisher)
   }
 }

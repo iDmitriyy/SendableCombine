@@ -6,7 +6,7 @@
 //
 
 import Foundation
-public import Combine
+public import SendablePublishers
 
 // MARK: - InfallibleValuePublisher
 
@@ -29,12 +29,12 @@ public struct AnyCurrentValuePublisher<Output, Failure: Error>: Publisher {
   // ? @export(implementation) @_transparent
   // TODO: add 2 __ underscores
   @usableFromInline @_transparent
-  internal init<P: Publisher>(retained_unverifiedValuePublisher base: P) where P.Output == Output, P.Failure == Failure {
+  internal init<P: Publisher & Sendable>(retained_unverifiedValuePublisher base: P)
+  where P.Output == Output, P.Failure == Failure {
     __base = base
   }
 
-  // TODO: - ?replace generic param by existential
-  // FIXME: retained_unverifiedValuePublisher should be Sendable in this initializer
+  
   @usableFromInline @_transparent
   internal init<P: Publisher>(retained_unverifiedValuePublisher base: P,
                                getCurrentValue _: @escaping () -> Output) where P.Output == Output, P.Failure == Failure {
@@ -48,11 +48,15 @@ public struct AnyCurrentValuePublisher<Output, Failure: Error>: Publisher {
 }
 
 extension AnyCurrentValuePublisher {
+  // TODO: - ?replace generic param by existential
+  // FIXME: retained_unverifiedValuePublisher should be Sendable in this initializer
+  
   /// For external types like Relay or Custom subjects with replay(1...) behavior
   @_spi(ExtensionsUnsafeAPI)
   @export(implementation) @_transparent
-  public init<P: Publisher>(unverified_ValueNonSendableSubject base: P,
-                            getCurrentValue: @escaping () -> Output) where P.Output == Output, P.Failure == Failure {
+  public init<P: Publisher & Sendable>(unverified_ValueNonSendableSubject base: P,
+                                       getCurrentValue: @escaping () -> Output)
+    where P.Output == Output, P.Failure == Failure {
     _ = getCurrentValue // needed only as a guarantee that subject can return value, e.g. for Relay from other lib.
     __base = base
   }
