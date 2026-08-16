@@ -10,15 +10,10 @@ public struct AnySendablePublisher<Output: Sendable, Failure: Error>: Publisher,
   @usableFromInline
   internal let anyPublisher: any Publisher<Output, Failure>
 
-  @inlinable
+  @export(implementation)
   internal init<P: Publisher>(_sendablePublisher_ sendablePublisher: P)
-    where P: Sendable, Output == P.Output, Failure == P.Failure {
+    where P: Sendable, P.Output == Output, P.Failure == Failure {
     anyPublisher = sendablePublisher
-  }
-
-  @inlinable
-  public init<P: Publisher>(_manuallyProven_Sendable_: P) where Output == P.Output, Failure == P.Failure {
-    anyPublisher = _manuallyProven_Sendable_
   }
 
   @export(implementation)
@@ -38,12 +33,5 @@ extension Publisher where Self: Sendable, Self.Output: Sendable {
   @export(implementation)
   public func eraseToAnyPublisher() -> AnySendablePublisher<Output, Failure> {
     AnySendablePublisher(_sendablePublisher_: self)
-  }
-}
-
-extension SendableShell {
-  @export(implementation)
-  public func eraseToAnyPublisher() -> AnySendablePublisher<Output, Failure> {
-    AnySendablePublisher(_manuallyProven_Sendable_: _base)
   }
 }

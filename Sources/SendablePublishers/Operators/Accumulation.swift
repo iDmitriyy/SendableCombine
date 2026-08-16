@@ -7,32 +7,32 @@
 
 // MARK: - Accumulation
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func scan<T: Sendable>(_ initial: T, _ nextPartialResult: @Sendable @escaping (T, Output) -> T)
-    -> SendableShell<Publishers.Scan<Upstream, T>> {
-    let scanned = Publishers.Scan(upstream: self._base, initialResult: initial, nextPartialResult: nextPartialResult)
-    return SendableShell<Publishers.Scan<Upstream, T>>(_manuallyProven_Sendable__: scanned)
+    -> some Publisher<T, Failure> & Sendable {
+    let scanned = Publishers.Scan(upstream: self, initialResult: initial, nextPartialResult: nextPartialResult)
+    return SendableShell<Publishers.Scan<Self, T>>(_manuallyProven_Sendable__: scanned)
   }
-  
+
   @export(implementation)
   public func tryScan<T: Sendable>(_ initial: T, _ nextPartialResult: @Sendable @escaping (T, Output) throws -> T)
-    -> SendableShell<Publishers.TryScan<Upstream, T>> {
-    let scanned = Publishers.TryScan(upstream: self._base, initialResult: initial, nextPartialResult: nextPartialResult)
-    return SendableShell<Publishers.TryScan<Upstream, T>>(_manuallyProven_Sendable__: scanned)
+    -> some Publisher<T, any Error> & Sendable {
+    let scanned = Publishers.TryScan(upstream: self, initialResult: initial, nextPartialResult: nextPartialResult)
+    return SendableShell<Publishers.TryScan<Self, T>>(_manuallyProven_Sendable__: scanned)
   }
-  
+
   @export(implementation)
   public func reduce<T: Sendable>(_ initial: T, _ nextPartialResult: @Sendable @escaping (T, Output) -> T)
-    -> SendableShell<Publishers.Reduce<Upstream, T>> {
-    let reduced = Publishers.Reduce(upstream: self._base, initial: initial, nextPartialResult: nextPartialResult)
-    return SendableShell<Publishers.Reduce<Upstream, T>>(_manuallyProven_Sendable__: reduced)
+    -> some Publisher<T, Failure> & Sendable {
+    let reduced = Publishers.Reduce(upstream: self, initial: initial, nextPartialResult: nextPartialResult)
+    return SendableShell<Publishers.Reduce<Self, T>>(_manuallyProven_Sendable__: reduced)
   }
-  
+
   @export(implementation)
   public func tryReduce<T: Sendable>(_ initial: T, _ nextPartialResult: @Sendable @escaping (T, Output) throws -> T)
-    -> SendableShell<Publishers.TryReduce<Upstream, T>> {
-    let reduced = Publishers.TryReduce(upstream: self._base, initial: initial, nextPartialResult: nextPartialResult)
-    return SendableShell<Publishers.TryReduce<Upstream, T>>(_manuallyProven_Sendable__: reduced)
+    -> some Publisher<T, any Error> & Sendable {
+    let reduced = Publishers.TryReduce(upstream: self, initial: initial, nextPartialResult: nextPartialResult)
+    return SendableShell<Publishers.TryReduce<Self, T>>(_manuallyProven_Sendable__: reduced)
   }
 }

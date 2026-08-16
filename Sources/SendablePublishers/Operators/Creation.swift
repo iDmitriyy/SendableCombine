@@ -7,24 +7,24 @@
 
 // MARK: - Creation Operators
 
-extension SendableShell {
+public enum SendablePublishersCreation {
   @export(implementation)
-  public static func empty(
+  public static func empty<Output: Sendable, Failure: Error>(
     completeImmediately: Bool = true,
-  ) -> SendableShell<Empty<Output, Failure>> {
+  ) -> some Publisher<Output, Failure> & Sendable {
     let empty = Empty<Output, Failure>(completeImmediately: completeImmediately)
     return SendableShell<Empty<Output, Failure>>(_manuallyProven_Sendable__: empty)
   }
 
   @export(implementation)
-  public static func just(_ output: Output) -> SendableShell<Just<Output>> where Failure == Never {
+  public static func just<Output: Sendable>(_ output: Output) -> some Publisher<Output, Never> & Sendable {
     let just = Just(output)
     return SendableShell<Just<Output>>(_manuallyProven_Sendable__: just)
   }
 
   @export(implementation)
-  public static func fail(_ error: Failure)
-    -> SendableShell<Fail<Output, Failure>> {
+  public static func fail<Output: Sendable, Failure: Error>(_ error: Failure)
+    -> some Publisher<Output, Failure> & Sendable {
     let fail = Fail<Output, Failure>(outputType: Output.self, failure: error)
     return SendableShell<Fail<Output, Failure>>(_manuallyProven_Sendable__: fail)
   }
@@ -32,16 +32,16 @@ extension SendableShell {
   @export(implementation)
   public static func deferred<P: Publisher & Sendable>(
     _ createPublisher: @Sendable @escaping () -> P,
-  ) -> SendableShell<Deferred<P>>
-    where P.Output: Sendable, P.Failure == Failure {
+  ) -> some Publisher<P.Output, P.Failure> & Sendable
+    where P.Output: Sendable {
     let deferred = Deferred(createPublisher: createPublisher)
     return SendableShell<Deferred<P>>(_manuallyProven_Sendable__: deferred)
   }
 
   @export(implementation)
-  public static func sequence<S: Sequence & Sendable>(
+  public static func sequence<S: Sequence & Sendable, Failure: Error>(
     _ elements: S,
-  ) -> SendableShell<Publishers.Sequence<S, Failure>> where S.Element == Output, S.Element: Sendable {
+  ) -> some Publisher<S.Element, Failure> & Sendable where S.Element: Sendable {
     let sequence = Publishers.Sequence<S, Failure>(sequence: elements)
     return SendableShell<Publishers.Sequence<S, Failure>>(_manuallyProven_Sendable__: sequence)
   }
@@ -49,7 +49,7 @@ extension SendableShell {
 
 public import Foundation
 
-extension SendableShell {
+extension SendablePublishersCreation {
   @export(implementation)
   public static func timer(
     interval: TimeInterval,
@@ -57,8 +57,7 @@ extension SendableShell {
     runLoop: RunLoop,
     mode: RunLoop.Mode = .default,
     options: RunLoop.SchedulerOptions? = nil,
-  ) -> SendableShell<Timer.TimerPublisher>
-    where Output == Date, Failure == Never {
+  ) -> some Publisher<Date, Never> & Sendable {
     let timer = Timer.publish(every: interval, tolerance: tolerance, on: runLoop, in: mode, options: options)
     return SendableShell<Timer.TimerPublisher>(_manuallyProven_Sendable__: timer)
   }

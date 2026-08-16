@@ -5,21 +5,21 @@
 //  Created by Dmitriy Ignatyev on 05.08.2026.
 //
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func receive<S: Scheduler & Sendable>(
     on scheduler: S,
     options: S.SchedulerOptions? = nil,
-  ) -> SendableShell<Publishers.ReceiveOn<Upstream, S>> {
-    let received = Publishers.ReceiveOn(upstream: _base, scheduler: scheduler, options: options)
-    return SendableShell<Publishers.ReceiveOn<Upstream, S>>(_manuallyProven_Sendable__: received)
+  ) -> some Publisher<Output, Failure> & Sendable {
+    let received = Publishers.ReceiveOn(upstream: self, scheduler: scheduler, options: options)
+    return SendableShell<Publishers.ReceiveOn<Self, S>>(_manuallyProven_Sendable__: received)
   }
 
   @export(implementation)
   public func subscribe<S: Scheduler & Sendable>(on scheduler: S,
                                                  options: S.SchedulerOptions? = nil)
-    -> SendableShell<Publishers.SubscribeOn<Upstream, S>> {
-    let subscribed = Publishers.SubscribeOn(upstream: _base, scheduler: scheduler, options: options)
-    return SendableShell<Publishers.SubscribeOn<Upstream, S>>(_manuallyProven_Sendable__: subscribed)
+    -> some Publisher<Output, Failure> & Sendable {
+    let subscribed = Publishers.SubscribeOn(upstream: self, scheduler: scheduler, options: options)
+    return SendableShell<Publishers.SubscribeOn<Self, S>>(_manuallyProven_Sendable__: subscribed)
   }
 }

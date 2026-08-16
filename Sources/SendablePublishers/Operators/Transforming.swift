@@ -5,45 +5,45 @@
 //  Created by Dmitriy Ignatyev on 04.08.2026.
 //
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
-  public func map<T>(_ transform: @Sendable @escaping (Output) -> T) -> SendableShell<Publishers.Map<Upstream, T>> {
-    let mapped = Publishers.Map(upstream: self._base, transform: transform)
-    return SendableShell<Publishers.Map<Upstream, T>>(_manuallyProven_Sendable__: mapped)
+  public func map<T: Sendable>(_ transform: @Sendable @escaping (Output) -> T) -> some Publisher<T, Failure> & Sendable {
+    let mapped = Publishers.Map(upstream: self, transform: transform)
+    return SendableShell<Publishers.Map<Self, T>>(_manuallyProven_Sendable__: mapped)
   }
   
   @export(implementation)
-  public func tryMap<T>(_ transform: @Sendable @escaping (Output) throws -> T)
-  -> SendableShell<Publishers.TryMap<Upstream, T>> {
-    let mapped = Publishers.TryMap(upstream: self._base, transform: transform)
-    return SendableShell<Publishers.TryMap<Upstream, T>>(_manuallyProven_Sendable__: mapped)
+  public func tryMap<T: Sendable>(_ transform: @Sendable @escaping (Output) throws -> T)
+  -> some Publisher<T, any Error> & Sendable {
+    let mapped = Publishers.TryMap(upstream: self, transform: transform)
+    return SendableShell<Publishers.TryMap<Self, T>>(_manuallyProven_Sendable__: mapped)
   }
   
   @export(implementation)
-  public func compactMap<T>(_ transform: @Sendable @escaping (Output) -> T?) -> SendableShell<Publishers.CompactMap<Upstream, T>> {
-    let compactMapped = Publishers.CompactMap(upstream: self._base, transform: transform)
-    return SendableShell<Publishers.CompactMap<Upstream, T>>(_manuallyProven_Sendable__: compactMapped)
+  public func compactMap<T: Sendable>(_ transform: @Sendable @escaping (Output) -> T?) -> some Publisher<T, Failure> & Sendable {
+    let compactMapped = Publishers.CompactMap(upstream: self, transform: transform)
+    return SendableShell<Publishers.CompactMap<Self, T>>(_manuallyProven_Sendable__: compactMapped)
   }
   
   @export(implementation)
-  public func tryCompactMap<T>(_ transform: @Sendable @escaping (Output) -> T?) -> SendableShell<Publishers.TryCompactMap<Upstream, T>> {
-    let compactMapped = Publishers.TryCompactMap(upstream: self._base, transform: transform)
-    return SendableShell<Publishers.TryCompactMap<Upstream, T>>(_manuallyProven_Sendable__: compactMapped)
+  public func tryCompactMap<T: Sendable>(_ transform: @Sendable @escaping (Output) -> T?) -> some Publisher<T, any Error> & Sendable {
+    let compactMapped = Publishers.TryCompactMap(upstream: self, transform: transform)
+    return SendableShell<Publishers.TryCompactMap<Self, T>>(_manuallyProven_Sendable__: compactMapped)
   }
   
   @export(implementation)
   public func flatMap<P: Publisher & Sendable>(
     maxPublishers: Subscribers.Demand = .unlimited,
     _ transform: @Sendable @escaping (Output) -> P,
-  ) -> SendableShell<Publishers.FlatMap<P, Upstream>> where P.Failure == Failure, P.Output: Sendable {
-    let flatMapped = Publishers.FlatMap(upstream: self._base, maxPublishers: maxPublishers, transform: transform)
-    return SendableShell<Publishers.FlatMap<P, Upstream>>(_manuallyProven_Sendable__: flatMapped)
+  ) -> some Publisher<P.Output, Failure> & Sendable where P.Failure == Failure, P.Output: Sendable {
+    let flatMapped = Publishers.FlatMap(upstream: self, maxPublishers: maxPublishers, transform: transform)
+    return SendableShell<Publishers.FlatMap<P, Self>>(_manuallyProven_Sendable__: flatMapped)
   }
 
   @export(implementation)
-  public func switchToLatest<P: Publisher & Sendable>() -> SendableShell<Publishers.SwitchToLatest<P, Upstream>>
-    where P == Upstream.Output, P.Failure == Upstream.Failure {
-    let switched = Publishers.SwitchToLatest(upstream: self._base)
-    return SendableShell<Publishers.SwitchToLatest<P, Upstream>>(_manuallyProven_Sendable__: switched)
+  public func switchToLatest<P: Publisher & Sendable>() -> some Publisher<P.Output, Failure> & Sendable
+    where P == Self.Output, P.Failure == Self.Failure, P.Output: Sendable {
+    let switched = Publishers.SwitchToLatest(upstream: self)
+    return SendableShell<Publishers.SwitchToLatest<P, Self>>(_manuallyProven_Sendable__: switched)
   }
 }

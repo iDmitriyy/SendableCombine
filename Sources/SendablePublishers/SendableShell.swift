@@ -23,36 +23,8 @@ public struct SendableShell<Upstream: Publisher>: Publisher & CustomStringConver
     _base.receive(subscriber: subscriber)
   }
 
-  @export(implementation)
-  public func eraseToOpaque() -> some SendablePublisher<Output, Failure> {
-    self
-  }
-
   public var description: String {
     "SendableShell<\(Upstream.self)>"
-  }
-}
-
-extension SendableShell where Upstream: Sendable {
-  @export(implementation)
-  internal init(sendablePublisher: Upstream) {
-    _base = sendablePublisher
-  }
-}
-
-// MARK: - Subject + AsSendablePublisher
-
-extension PassthroughSubject where Output: Sendable {
-  @export(implementation)
-  public func asSendablePublisher() -> SendableShell<PassthroughSubject<Output, Failure>> {
-    SendableShell(sendablePublisher: self)
-  }
-}
-
-extension CurrentValueSubject where Output: Sendable {
-  @export(implementation)
-  public func asSendablePublisher() -> SendableShell<CurrentValueSubject<Output, Failure>> {
-    SendableShell(sendablePublisher: self)
   }
 }
 

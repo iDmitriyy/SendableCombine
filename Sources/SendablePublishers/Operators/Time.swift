@@ -7,70 +7,69 @@
 
 // MARK: - TimeShifting
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func delay<S: Scheduler>(for interval: S.SchedulerTimeType.Stride,
                                   tolerance: S.SchedulerTimeType.Stride? = nil,
                                   scheduler: S, options: S.SchedulerOptions? = nil)
-    -> SendableShell<Publishers.Delay<Upstream, S>> {
-    let delay = _base.delay(for: interval, scheduler: scheduler)
-    return SendableShell<Publishers.Delay<Upstream, S>>(_manuallyProven_Sendable__: delay)
+    -> some Publisher<Output, Failure> & Sendable {
+    let delay = self.Combine::delay(for: interval, scheduler: scheduler)
+    return SendableShell<Publishers.Delay<Self, S>>(_manuallyProven_Sendable__: delay)
   }
 }
 
 // MARK: - Time-based Filtering
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func debounce<S: Scheduler & Sendable>(
     for dueTime: S.SchedulerTimeType.Stride,
     scheduler: S,
     options: S.SchedulerOptions? = nil
-  ) -> SendableShell<Publishers.Debounce<Upstream, S>> {
-    let debounced = Publishers.Debounce(upstream: self._base, dueTime: dueTime, scheduler: scheduler, options: options)
-    return SendableShell<Publishers.Debounce<Upstream, S>>(_manuallyProven_Sendable__: debounced)
+  ) -> some Publisher<Output, Failure> & Sendable {
+    let debounced = Publishers.Debounce(upstream: self, dueTime: dueTime, scheduler: scheduler, options: options)
+    return SendableShell<Publishers.Debounce<Self, S>>(_manuallyProven_Sendable__: debounced)
   }
-  
+
   @export(implementation)
   public func throttle<S: Scheduler & Sendable>(
     for interval: S.SchedulerTimeType.Stride,
     scheduler: S,
     latest: Bool
-  ) -> SendableShell<Publishers.Throttle<Upstream, S>> {
-    let throttled = Publishers.Throttle(upstream: self._base, interval: interval, scheduler: scheduler, latest: latest)
-    return SendableShell<Publishers.Throttle<Upstream, S>>(_manuallyProven_Sendable__: throttled)
+  ) -> some Publisher<Output, Failure> & Sendable {
+    let throttled = Publishers.Throttle(upstream: self, interval: interval, scheduler: scheduler, latest: latest)
+    return SendableShell<Publishers.Throttle<Self, S>>(_manuallyProven_Sendable__: throttled)
   }
 }
 
 // MARK: - Timeout
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func timeout<S: Scheduler & Sendable>(
     _ interval: S.SchedulerTimeType.Stride,
     scheduler: S,
     options: S.SchedulerOptions? = nil,
     customError: @Sendable @escaping () -> Failure
-  ) -> SendableShell<Publishers.Timeout<Upstream, S>> {
-    let timeout = Publishers.Timeout(upstream: self._base,
+  ) -> some Publisher<Output, Failure> & Sendable {
+    let timeout = Publishers.Timeout(upstream: self,
                                      interval: interval,
                                      scheduler: scheduler,
                                      options: options,
                                      customError: customError)
-    return SendableShell<Publishers.Timeout<Upstream, S>>(_manuallyProven_Sendable__: timeout)
+    return SendableShell<Publishers.Timeout<Self, S>>(_manuallyProven_Sendable__: timeout)
   }
 }
 
 // MARK: - Others
 
-extension SendableShell {
+extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func measureInterval<S: Scheduler & Sendable>(
     using scheduler: S,
     options: S.SchedulerOptions? = nil
-  ) -> SendableShell<Publishers.MeasureInterval<Upstream, S>> {
-    let measured = _base.measureInterval(using: scheduler, options: options)
-    return SendableShell<Publishers.MeasureInterval<Upstream, S>>(_manuallyProven_Sendable__: measured)
+  ) -> some Publisher<S.SchedulerTimeType.Stride, Failure> & Sendable where S.SchedulerTimeType.Stride: Sendable {
+    let measured = self.Combine::measureInterval(using: scheduler, options: options)
+    return SendableShell<Publishers.MeasureInterval<Self, S>>(_manuallyProven_Sendable__: measured)
   }
 }
-
