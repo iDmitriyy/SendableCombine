@@ -5,8 +5,6 @@
 //  Created by Dmitriy Ignatyev on 06.08.2026.
 //
 
-public import Combine
-
 extension AnyCurrentValuePublisher {
   /// Filters values from this publisher, guaranteeing that the first value
   /// is always emitted regardless of the predicate.
@@ -23,7 +21,7 @@ extension AnyCurrentValuePublisher {
   public func filterAfterFirst(_ isIncluded: @Sendable @escaping (Output) -> Bool)
     -> AnyCurrentValuePublisher<Output, Failure> {
       let filterAfterFirst = _FilterAfterFirst(upstream: self, isIncluded: isIncluded)
-      return AnyCurrentValuePublisher(retained_unverifiedValuePublisher: filterAfterFirst)
+      return AnyCurrentValuePublisher(manuallyProven_SemiSendable: filterAfterFirst)
   }
 }
 
@@ -35,10 +33,10 @@ internal struct _FilterAfterFirst<Upstream: Publisher>: Publisher {
   @usableFromInline typealias Failure = Upstream.Failure
 
   let upstream: Upstream
-  let isIncluded: (Output) -> Bool
+  let isIncluded: @Sendable (Output) -> Bool
 
   @usableFromInline
-  init(upstream: Upstream, isIncluded: @escaping (Output) -> Bool) {
+  init(upstream: Upstream, isIncluded: @Sendable @escaping (Output) -> Bool) {
     self.upstream = upstream
     self.isIncluded = isIncluded
   }

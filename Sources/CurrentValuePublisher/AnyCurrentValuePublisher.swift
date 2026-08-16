@@ -5,8 +5,8 @@
 //  Created by Dmitriy Ignatyev on 07.08.2026.
 //
 
-import Foundation
 public import SendablePublishers
+@_exported public import Combine
 
 // MARK: - InfallibleValuePublisher
 
@@ -15,7 +15,7 @@ public typealias AnyInfallibleValuePublisher<Output> = AnyCurrentValuePublisher<
 
 //===-------------------------------------------------------------------------------------------------------------------===//
 
-// MARK: - CurrentValuePublisher (Non-Versioned, Generic Failure)
+// MARK: - CurrentValuePublisher
 
 /// A type-erasing publisher that represents a continuous state or value stream.
 ///
@@ -24,45 +24,35 @@ public typealias AnyInfallibleValuePublisher<Output> = AnyCurrentValuePublisher<
 public struct AnyCurrentValuePublisher<Output, Failure: Error>: Publisher {
   @usableFromInline
   internal let __base: any Publisher<Output, Failure>
-
-  // TODO: - ?replace generic param by existential
-  // ? @export(implementation) @_transparent
-  // TODO: add 2 __ underscores
-  @usableFromInline @_transparent
-  internal init<P: Publisher & Sendable>(retained_unverifiedValuePublisher base: P)
-  where P.Output == Output, P.Failure == Failure {
-    __base = base
-  }
-
   
   @usableFromInline @_transparent
-  internal init<P: Publisher>(retained_unverifiedValuePublisher base: P,
-                               getCurrentValue _: @escaping () -> Output) where P.Output == Output, P.Failure == Failure {
+  internal init(manuallyProven_SemiSendable base: any Publisher<Output, Failure>) {
     __base = base
   }
 
-  @export(implementation) @_transparent
+  @export(implementation)
   public func receive<S: Subscriber>(subscriber: S) where S.Input == Output, S.Failure == Failure {
     __base.receive(subscriber: subscriber)
   }
 }
 
+extension AnyCurrentValuePublisher: @unchecked Sendable where Output: Sendable {}
+
 extension AnyCurrentValuePublisher {
-  // TODO: - ?replace generic param by existential
-  // FIXME: retained_unverifiedValuePublisher should be Sendable in this initializer
-  
   /// For external types like Relay or Custom subjects with replay(1...) behavior
   @_spi(ExtensionsUnsafeAPI)
-  @export(implementation) @_transparent
-  public init<P: Publisher & Sendable>(unverified_ValueNonSendableSubject base: P,
+  @export(implementation)
+  public init<P: Publisher & Sendable>(manuallyProven_ReplayCurrentValuePublisher base: P,
                                        getCurrentValue: @escaping () -> Output)
-    where P.Output == Output, P.Failure == Failure {
+    where P.Output: Sendable, P.Output == Output, P.Failure == Failure {
     _ = getCurrentValue // needed only as a guarantee that subject can return value, e.g. for Relay from other lib.
     __base = base
   }
-  
-  @export(implementation) @_transparent
-  public init(_ subject: CurrentValueSubject<Output, Failure>) {
-    self.init(retained_unverifiedValuePublisher: subject)
+}
+
+extension CurrentValueSubject {
+  @export(implementation)
+  public func asCurrentValuePublisher() -> AnyCurrentValuePublisher<Output, Failure> {
+    AnyCurrentValuePublisher(manuallyProven_SemiSendable: self)
   }
 }
