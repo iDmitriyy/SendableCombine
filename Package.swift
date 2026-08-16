@@ -16,7 +16,10 @@ let package = Package(
     .target(name: "SendablePublishers"),
     .target(name: "CancellationBag",
             dependencies: ["SendableCombineLogging"],
-            swiftSettings: [.enableExperimentalFeature("StaticExclusiveOnly")]),
+            swiftSettings: [
+              .enableExperimentalFeature("StaticExclusiveOnly"),
+              .unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release)),
+            ]),
     .target(name: "SendableCombineLogging",
             swiftSettings: [.unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release))]),
     .target(name: "CurrentValuePublisher",
