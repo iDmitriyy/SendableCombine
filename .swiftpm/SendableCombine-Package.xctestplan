@@ -1,0 +1,54 @@
+{
+  "configurations" : [
+    {
+      "id" : "2975E104-4A39-455E-A3E5-C114BEBD8324",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "performanceAntipatternCheckerEnabled" : true,
+    "testInteropMode" : "complete"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SendablePublishersTests",
+        "name" : "SendablePublishersTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SendableCombineTests",
+        "name" : "SendableCombineTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "MainActorPublishersTests",
+        "name" : "MainActorPublishersTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "CurrentValuePublisherTests",
+        "name" : "CurrentValuePublisherTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "CancellationBagTests",
+        "name" : "CancellationBagTests"
+      }
+    }
+  ],
+  "version" : 1
+}
