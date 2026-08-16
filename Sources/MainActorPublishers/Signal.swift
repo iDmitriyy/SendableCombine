@@ -54,7 +54,7 @@ import SendableCombineLogging
 /// receive `.finished` immediately. To prevent these silent pipeline terminations during
 /// development, every factory initializer / conversion includes an optional `logWhenTerminated`
 /// parameter (enabled by default) that logs a diagnostic warning via `SendableCombineLogging`.
-public struct Signal<Element: Sendable>: Publisher {
+public struct Signal<Element: Sendable> {
   @usableFromInline internal let _upstream: AnyPublisher<Element, Never>
 }
 

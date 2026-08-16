@@ -17,8 +17,8 @@ public struct AnySendablePublisher<Output: Sendable, Failure: Error>: Publisher,
   }
 
   @inlinable
-  public init<P: Publisher>(_unverifiedSendablePublisher_: P) where Output == P.Output, Failure == P.Failure {
-    anyPublisher = _unverifiedSendablePublisher_
+  public init<P: Publisher>(_manuallyProven_Sendable_: P) where Output == P.Output, Failure == P.Failure {
+    anyPublisher = _manuallyProven_Sendable_
   }
 
   @export(implementation)
@@ -44,6 +44,6 @@ extension Publisher where Self: Sendable, Self.Output: Sendable {
 extension SendableShell {
   @export(implementation)
   public func eraseToAnyPublisher() -> AnySendablePublisher<Output, Failure> {
-    AnySendablePublisher(_unverifiedSendablePublisher_: _base)
+    AnySendablePublisher(_manuallyProven_Sendable_: _base)
   }
 }
