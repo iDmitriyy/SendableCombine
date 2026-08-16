@@ -35,7 +35,7 @@ public final class SendableCombineLogEntry: Sendable {
                message: String,
                info: SendableErrorInfo = [:]) {
     self.code = code.intValue
-    codeString = "\(code)"
+    codeString = "\(code)" // TODO: check String is correct
     self.message = message
     self.info = info
   }
