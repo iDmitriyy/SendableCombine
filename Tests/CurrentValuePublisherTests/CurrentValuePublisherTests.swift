@@ -7,7 +7,7 @@ struct AnyCurrentValuePublisherTests {
   @Test("Emits value on subscription")
   func emitsOnSubscribe() async {
     let subject = CurrentValueSubject<Int, Never>(42)
-    let publisher = AnyCurrentValuePublisher(subject)
+    let publisher = subject.asCurrentValuePublisher()
 
     let received = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
       var values = [Int]()
@@ -27,7 +27,7 @@ struct AnyCurrentValuePublisherTests {
   @Test("Receives subsequent values after subscription")
   func receivesSubsequentValues() async {
     let subject = CurrentValueSubject<Int, Never>(42)
-    let publisher = AnyCurrentValuePublisher(subject)
+    let publisher = subject.asCurrentValuePublisher()
 
     let received = await withCheckedContinuation { (continuation: CheckedContinuation<[Int], Never>) in
       var values = [Int]()
