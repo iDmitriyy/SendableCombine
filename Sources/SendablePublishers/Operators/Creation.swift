@@ -7,7 +7,7 @@
 
 // MARK: - Creation Operators
 
-public enum SendablePublishersCreation {
+public enum SendablePublishers {
   @export(implementation)
   public static func empty<Output: Sendable, Failure: Error>(
     completeImmediately: Bool = true,
@@ -31,7 +31,7 @@ public enum SendablePublishersCreation {
 
   @export(implementation)
   public static func deferred<P: Publisher & Sendable>(
-    _ createPublisher: @Sendable @escaping () -> P,
+    _ createPublisher: sending @escaping () -> P,
   ) -> some Publisher<P.Output, P.Failure> & Sendable
     where P.Output: Sendable {
     let deferred = Deferred(createPublisher: createPublisher)
@@ -49,7 +49,7 @@ public enum SendablePublishersCreation {
 
 public import Foundation
 
-extension SendablePublishersCreation {
+extension SendablePublishers {
   @export(implementation)
   public static func timer(
     interval: TimeInterval,
