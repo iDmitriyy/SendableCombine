@@ -102,68 +102,14 @@ extension Driver {
   }
 }
 
+// TODO: - add test case that every new subscriber her last value. connect() / multicast should not break replay(1)
+
 // MARK: - Common Initializer
 
 extension Driver {
   private typealias SharedState = (publisher: AnySendablePublisher<Element, Never>?, cancellable: (any Cancellable)?)
 
   // MARK: - Init with Infallible Publisher
-
-//  @inline(never)
-//  internal init<P: Publisher>(infallibleUpstream: P,
-//                              initialValue: Element,
-//                              logWhenTerminated: Bool) where P.Output == Element, P.Failure == Never {
-//    let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
-//
-//    let lazyPublisher = SendablePublishers.deferred {
-//      lock.withLockUnchecked { state in
-//        if let existing = state.publisher {
-//          return existing
-//        }
-//
-//        /// 1. CurrentValueSubject acts as an internal state buffer.
-//        /// It inherently preserves the backpressure contract: it requests .unlimited from the upstream
-//        /// and safely relays individual downstream Demand to its active subscribers.
-//        let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
-//
-//        func makeMainActorSharedStream(from infallible: some Publisher<Output, Never>)
-//          -> AnyPublisher<Output, Never> {
-//          /// 2. Multicast bridges the upstream to the buffer subject.
-//          /// This ensures the upstream is shared and subscribed to exactly ONCE (subscriptionCount == 1).
-//          let connectable = infallible
-//            .multicast(subject: bufferSubject)
-//
-//          // 3. Atomically connect to the upstream. Demand tracking flows via internal Combine mechanisms.
-//          state.cancellable = connectable.connect()
-//
-//          /// 4. Re-schedule the shared stream onto the main queue **downstream** of the buffer.
-//          /// Placing `receive(on:)` here (instead of upstream of `multicast`) guarantees that the buffer's
-//          /// synchronously replayed current value is also delivered on the main thread, no matter which
-//          /// thread performed the subscription.
-//          let shared = connectable
-//            .receive(on: DispatchQueue.main)
-//            .eraseToAnyPublisher()
-//
-//          state.publisher = shared
-//          return shared
-//        } // end makeMainActorSharedStream(...)
-//
-//        if logWhenTerminated {
-//          let withTerminationDiagnostic = infallibleUpstream
-//            .handleEvents(receiveCompletion: { completion in
-//              _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-//                                        sharedPublisherName: "Driver<\(Output.self)>",
-//                                        completion: completion)
-//            })
-//          return makeMainActorSharedStream(from: withTerminationDiagnostic)
-//        } else {
-//          return makeMainActorSharedStream(from: infallibleUpstream)
-//        }
-//      } // end withLockUnchecked
-//    } // end Deferred
-//
-//    _upstream = AnySendablePublisher(_sendablePublisher_: lazyPublisher)
-//  }
 
   @inline(never)
   internal init<P: Publisher & Sendable>(
@@ -196,7 +142,8 @@ extension Driver {
   }
 
   @inline(never)
-  internal init(infallibleCurrentValueSubject: CurrentValueSubject<Element, Never>, logWhenTerminated: Bool) {
+  internal init(infallibleCurrentValueSubject: CurrentValueSubject<Element, Never>,
+                logWhenTerminated: Bool) {
     let upstream: any Publisher<Element, Never> & Sendable = if logWhenTerminated {
       infallibleCurrentValueSubject.handleEvents(receiveCompletion: { completion in
         _logTerminationDiagnostic(
@@ -222,23 +169,7 @@ extension Driver {
   /*
     TBD: Do we need to log case when initialValue was dropped? This is the case when CurrentValueSubject
    (and CurrentValuePublisher in common) is erased as Publisher and converted to Driver via asDriver + initialValue.
-
-    /// Creates a `Driver` from an infallible publisher, same as `init(infallibleUpstream:initialValue:)`,
-    /// but additionally logs a diagnostic when the `initialValue` is silently dropped.
-    ///
-    /// The `initialValue` is dropped when the upstream gets connected (inside a `Deferred` block) before the
-    /// first downstream subscriber attaches: a hot or replay(1) source (`CurrentValueSubject`, `@Published`,
-    /// `Just`, ...) synchronously emits during `connect()`, replacing the buffer's `initialValue` so it is
-    /// never delivered.
-    ///
-    /// This variant detects the drop with a lightweight `handleEvents(receiveOutput:)` tap placed **before**
-    /// `.receive(on: DispatchQueue.main)` — the tap fires synchronously at connection time, when no subscriber
-    /// exists yet — and logs once via the `SendableCombineLogging` observer. It requires no extra `Subject` and no value equality checks.
-    ///
-    /// - Parameters:
-    ///   - infallibleUpstream2: An existing publisher that is guaranteed never to emit failures (`Failure == Never`).
-    ///   - initialValue: The default baseline element emitted upon subscription if the upstream hasn't emitted anything.
-    ///   - logWhenInitialValueDropped: When `true` (default), logs the dropped-initialValue diagnostic once.
+   
     public init<P: Publisher>(infallibleUpstream2: P,
                               initialValue: Element,
                               logWhenInitialValueDropped: Bool) where P.Output == Element, P.Failure == Never {
@@ -312,59 +243,3 @@ extension Driver {
    }
     */
 }
-
-// @inline(never)
-// internal init<P: Publisher>(infallibleUpstream: P,
-//                            initialValue: Element,
-//                            logWhenTerminated: Bool) where P.Output == Element, P.Failure == Never {
-//  let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
-//
-//  let lazyPublisher = SendablePublishers.deferred {
-//    lock.withLockUnchecked { state in
-//      if let existing = state.publisher {
-//        return existing
-//      }
-//
-//      /// 1. CurrentValueSubject acts as an internal state buffer.
-//      /// It inherently preserves the backpressure contract: it requests .unlimited from the upstream
-//      /// and safely relays individual downstream Demand to its active subscribers.
-//      let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
-//
-//      func makeMainActorSharedStream(from infallible: some Publisher<Output, Never>)
-//        -> AnyPublisher<Output, Never> {
-//        /// 2. Multicast bridges the upstream to the buffer subject.
-//        /// This ensures the upstream is shared and subscribed to exactly ONCE (subscriptionCount == 1).
-//        let connectable = infallible
-//          .multicast(subject: bufferSubject)
-//
-//        // 3. Atomically connect to the upstream. Demand tracking flows via internal Combine mechanisms.
-//        state.cancellable = connectable.connect()
-//
-//        /// 4. Re-schedule the shared stream onto the main queue **downstream** of the buffer.
-//        /// Placing `receive(on:)` here (instead of upstream of `multicast`) guarantees that the buffer's
-//        /// synchronously replayed current value is also delivered on the main thread, no matter which
-//        /// thread performed the subscription.
-//        let shared = connectable
-//          .receive(on: DispatchQueue.main)
-//          .eraseToAnyPublisher()
-//
-//        state.publisher = shared
-//        return shared
-//      } // end makeMainActorSharedStream(...)
-//
-//      if logWhenTerminated {
-//        let withTerminationDiagnostic = infallibleUpstream
-//          .handleEvents(receiveCompletion: { completion in
-//            _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-//                                      sharedPublisherName: "Driver<\(Output.self)>",
-//                                      completion: completion)
-//          })
-//        return makeMainActorSharedStream(from: withTerminationDiagnostic)
-//      } else {
-//        return makeMainActorSharedStream(from: infallibleUpstream)
-//      }
-//    } // end withLockUnchecked
-//  } // end Deferred
-//
-//  _upstream = AnySendablePublisher(_sendablePublisher_: lazyPublisher)
-// }
