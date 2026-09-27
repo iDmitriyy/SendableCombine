@@ -79,8 +79,8 @@ public typealias SendableCombineLoggingObserver =
 fileprivate let _observer = Mutex<SendableCombineLoggingObserver?>(nil)
 
 public func _inject_Once(loggingObserver: sending @escaping SendableCombineLoggingObserver,
-                              file: StaticString = #file,
-                              line: UInt = #line) {
+                         file: StaticString = #file,
+                         line: UInt = #line) {
   let existingObserver = _observer.withLock { maybeObserver -> SendableCombineLoggingObserver? in
     if let alreadyInjectedObserver = maybeObserver {
       return alreadyInjectedObserver
@@ -89,7 +89,7 @@ public func _inject_Once(loggingObserver: sending @escaping SendableCombineLoggi
       return nil
     }
   }
-  
+
   if let existingObserver {
     let message = "Trying to inject a logging observer more than once."
     let entry = SendableCombineLogEntry(code: .loggingObserverReinjection, message: message)
