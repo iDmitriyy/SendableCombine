@@ -55,7 +55,7 @@ public struct Driver<Element: Sendable>: Sendable {
   fileprivate let _connectionCancellable: any Sendable
 
   init(_unchecked_HotUpstream: any Publisher<Output, Failure> & Sendable,
-       connectionCancellable: sending any Cancellable) {
+       connectionCancellable: any Cancellable) {
     _hotUpstream = _unchecked_HotUpstream
     _connectionCancellable = OSAllocatedUnfairLock(uncheckedState: connectionCancellable)
   }
@@ -117,32 +117,17 @@ extension Driver {
     initialValue: Element,
     logWhenTerminated: Bool,
   ) where P.Output: Sendable, P.Output == Element, P.Failure == Never {
-    let upstream: any Publisher<Element, Never> & Sendable = if logWhenTerminated {
-      infallibleUpstream.handleEvents(receiveCompletion: { completion in
-          _logTerminationDiagnostic(
-            logWhenTerminated: logWhenTerminated,
-            sharedPublisherName: "Driver<\(Output.self)>",
-            completion: completion,
-          )
-        })
-    } else {
-      infallibleUpstream
-    }
-    
     let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
+    let upstreamCancellable = infallibleUpstream.subscribe(bufferSubject)
     
-    let connectable = upstream
-      .receive(on: DispatchQueue.main)
-      .multicast(subject: bufferSubject)
-    
-    let connectionCancellable = connectable.connect()
-    
-    self.init(_unchecked_HotUpstream: bufferSubject,
-              connectionCancellable: connectionCancellable)
+    self.init(infallibleCurrentValueSubject: bufferSubject,
+              upstreamCancellable: upstreamCancellable,
+              logWhenTerminated: logWhenTerminated)
   }
 
   @inline(never)
   internal init(infallibleCurrentValueSubject: CurrentValueSubject<Element, Never>,
+                upstreamCancellable: (any Cancellable)?,
                 logWhenTerminated: Bool) {
     let upstream: any Publisher<Element, Never> & Sendable = if logWhenTerminated {
       infallibleCurrentValueSubject.handleEvents(receiveCompletion: { completion in
@@ -162,8 +147,13 @@ extension Driver {
 
     let connectionCancellable = connectable.connect()
     
+    let cancellable = AnyCancellable {
+      connectionCancellable.cancel()
+      upstreamCancellable?.cancel()
+    }
+    
     self.init(_unchecked_HotUpstream: connectable,
-              connectionCancellable: connectionCancellable)
+              connectionCancellable: cancellable)
   }
 
   /*

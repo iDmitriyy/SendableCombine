@@ -5,9 +5,10 @@
 //  Created by Dmitriy Ignatyev on 27.09.2026.
 //
 
-//public import Combine
-import Foundation
 public import SendablePublishers
+
+// public import Combine
+import Foundation
 
 // MARK: - CurrentValueSubject as Driver
 
@@ -27,7 +28,9 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
   ///   `.failure`) as a diagnostic warning; `false` disables the logging.
   /// - Returns: A `Driver` instance.
   public func asDriver(logWhenTerminated: Bool = true) -> Driver<Output> {
-    Driver<Output>.init(infallibleCurrentValueSubject: self, logWhenTerminated: logWhenTerminated)
+    Driver<Output>(infallibleCurrentValueSubject: self,
+                   upstreamCancellable: nil,
+                   logWhenTerminated: logWhenTerminated)
   }
 }
 
@@ -69,7 +72,7 @@ extension Publisher where Self: Sendable, Output: Sendable {
   /// - Parameter initialValue: The default state element transmitted synchronously upon subscriber connection
   ///   if the upstream hasn't emitted anything.
   /// - Returns: A `Driver` instance.
-  public func asDriverIgnoringError(initialValue: Output, logWhenTerminated: Bool = true) -> Driver<Output> {
+  public func asDriverIgnoringError(initialValue _: Output, logWhenTerminated _: Bool = true) -> Driver<Output> {
     fatalError()
 //    func makeDriver(failableSource: some Publisher<Output, Failure> & Sendable) -> Driver<Output> {
 //      let infallible: any Publisher<Output, Never> & Sendable =
@@ -107,9 +110,9 @@ extension Publisher where Self: Sendable, Output: Sendable {
   ///   - catchError: A thread-safe, `@Sendable` closure invoked to transform an upstream `Failure`
   ///     into a safe fallback `Output` element.
   /// - Returns: A `Driver` instance that emits a fallback value upon error.
-  public func asDriver(initialValue: Output,
-                       logWhenTerminated: Bool = true,
-                       catchError: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
+  public func asDriver(initialValue _: Output,
+                       logWhenTerminated _: Bool = true,
+                       catchError _: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
     fatalError()
 //    func makeDriver(failableSource: some Publisher<Output, Failure> & Sendable) -> Driver<Output> {
 //      let infallible = failableSource.catch { failure in Just(catchError(failure)) }
