@@ -9,11 +9,13 @@
 
 // MARK: - Protocol
 
-public typealias SendablePublisher<Output: Sendable, Failure> = Publisher<Output, Failure> & Sendable
+// TBD: do we need these typealias in library or one can define them in own codebase?
 
-public typealias InfalliblePublisher<Output> = Publisher<Output, Never> & Sendable
+// public typealias SendablePublisher<Output: Sendable, Failure> = Publisher<Output, Failure> & Sendable
 
-public typealias AnyInfalliblePublisher<Output> = AnySendablePublisher<Output, Never>
+// public typealias InfalliblePublisher<Output> = Publisher<Output, Never> & Sendable
+
+// public typealias AnyInfalliblePublisher<Output> = AnySendablePublisher<Output, Never>
 
 //func test(a: any SendablePublisher<String, any Error>,
 //          b: any InfalliblePublisher<String>,

@@ -30,12 +30,11 @@ public enum SendablePublishers {
   }
 
   @export(implementation)
-  public static func deferred<P: Publisher & Sendable>(
-    _ createPublisher: sending @escaping () -> P,
-  ) -> some Publisher<P.Output, P.Failure> & Sendable
-    where P.Output: Sendable {
+  public static func deferred<P: Publisher>(
+    _ createPublisher: @escaping () -> P,
+  ) -> some Publisher<P.Output, P.Failure> & Sendable where P.Output: Sendable {
     let deferred = Deferred(createPublisher: createPublisher)
-    return SendableShell<Deferred<P>>(_manuallyProven_Sendable__: deferred)
+    return SendableShell(_manuallyProven_Sendable__: deferred)
   }
 
   @export(implementation)

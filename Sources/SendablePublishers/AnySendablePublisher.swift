@@ -5,21 +5,27 @@
 //  Created by Dmitriy Ignatyev on 05.08.2026.
 //
 
-public struct AnySendablePublisher<Output: Sendable, Failure: Error>: Publisher, @unchecked Sendable,
-  CustomStringConvertible {
+// FIXME: - may be obsoleted as now it is simply typealias = any Publisher<Output, Failure> & Sendable
+
+public struct AnySendablePublisher<Output: Sendable, Failure: Error>: Publisher, Sendable, CustomStringConvertible {
   @usableFromInline
-  internal let anyPublisher: any Publisher<Output, Failure>
+  package let anyPublisher: any Publisher<Output, Failure> & Sendable
 
   @export(implementation)
-  internal init<P: Publisher>(_sendablePublisher_ sendablePublisher: P)
+  public init<P: Publisher>(_sendablePublisher_ sendablePublisher: P)
     where P: Sendable, P.Output == Output, P.Failure == Failure {
     anyPublisher = sendablePublisher
   }
 
-  @export(implementation)
+@export(implementation)
   public func receive<Downstream: Subscriber>(subscriber: Downstream)
     where Output == Downstream.Input, Failure == Downstream.Failure {
-      anyPublisher.receive(subscriber: subscriber)
+    anyPublisher.receive(subscriber: subscriber)
+  }
+
+  @export(implementation)
+  public var publisher: any Publisher<Output, Failure> {
+    anyPublisher
   }
 
   public var description: String {

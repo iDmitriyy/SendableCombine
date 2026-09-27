@@ -5,9 +5,9 @@
 //  Created by Dmitriy Ignatyev on 27.09.2026.
 //
 
-public import Combine
+//public import Combine
 import Foundation
-import SendablePublishers
+public import SendablePublishers
 
 // MARK: - CurrentValueSubject as Driver
 
@@ -27,26 +27,13 @@ extension CurrentValueSubject where Failure == Never, Output: Sendable {
   ///   `.failure`) as a diagnostic warning; `false` disables the logging.
   /// - Returns: A `Driver` instance.
   public func asDriver(logWhenTerminated: Bool = true) -> Driver<Output> {
-    if logWhenTerminated {
-      let upstream = handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  sharedPublisherName: "Driver<\(Output.self)>",
-                                  completion: completion)
-      })
-      .receive(on: DispatchQueue.main)
-      .eraseToAnyPublisher()
-      return Driver(_unchecked_HotUpstream: upstream)
-    } else {
-      let upstream = receive(on: DispatchQueue.main)
-        .eraseToAnyPublisher()
-      return Driver(_unchecked_HotUpstream: upstream)
-    }
+    Driver<Output>.init(infallibleCurrentValueSubject: self, logWhenTerminated: logWhenTerminated)
   }
 }
 
 // MARK: - Publisher as Driver (Infallible)
 
-extension Publisher where Failure == Never, Output: Sendable {
+extension Publisher where Self: Sendable, Failure == Never, Output: Sendable {
   /// Transforms an infallible publisher into a `Driver`.
   ///
   /// Use this operator when your upstream data source is already guaranteed never to fail
@@ -67,7 +54,7 @@ extension Publisher where Failure == Never, Output: Sendable {
 
 // MARK: - Publisher as Driver (Failable)
 
-extension Publisher where Output: Sendable {
+extension Publisher where Self: Sendable, Output: Sendable {
   /// Transforms a failable publisher into a driver stream by dropping any generated errors silently.
   ///
   /// This operator is designed for non-critical UI updates where an error condition should simply
@@ -83,21 +70,23 @@ extension Publisher where Output: Sendable {
   ///   if the upstream hasn't emitted anything.
   /// - Returns: A `Driver` instance.
   public func asDriverIgnoringError(initialValue: Output, logWhenTerminated: Bool = true) -> Driver<Output> {
-    func makeDriver(failableSource: some Publisher<Output, Failure>) -> Driver<Output> {
-      let infallible = failableSource.catch { _ in Empty<Output, Never>() }
-      return Driver(infallibleUpstream: infallible, initialValue: initialValue, logWhenTerminated: false)
-    }
-
-    if logWhenTerminated {
-      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  sharedPublisherName: "Driver<\(Output.self)>",
-                                  completion: completion)
-      })
-      return makeDriver(failableSource: withTerminationDiagnostic)
-    } else {
-      return makeDriver(failableSource: self)
-    }
+    fatalError()
+//    func makeDriver(failableSource: some Publisher<Output, Failure> & Sendable) -> Driver<Output> {
+//      let infallible: any Publisher<Output, Never> & Sendable =
+//        failableSource.SendablePublishers::`catch` { _ in Empty<Output, Never>() }
+//      return Driver(infallibleUpstream: infallible, initialValue: initialValue, logWhenTerminated: false)
+//    }
+//
+//    if logWhenTerminated {
+//      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
+//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+//                                  sharedPublisherName: "Driver<\(Output.self)>",
+//                                  completion: completion)
+//      })
+//      return makeDriver(failableSource: withTerminationDiagnostic)
+//    } else {
+//      return makeDriver(failableSource: self)
+//    }
   }
 
   /// Transforms a failable publisher into a driver stream, recovering from errors with a fallback state mapping.
@@ -121,20 +110,21 @@ extension Publisher where Output: Sendable {
   public func asDriver(initialValue: Output,
                        logWhenTerminated: Bool = true,
                        catchError: @Sendable @escaping (Failure) -> Output) -> Driver<Output> {
-    func makeDriver(failableSource: some Publisher<Output, Failure>) -> Driver<Output> {
-      let infallible = failableSource.catch { failure in Just(catchError(failure)) }
-      return Driver(infallibleUpstream: infallible, initialValue: initialValue, logWhenTerminated: false)
-    }
-
-    if logWhenTerminated {
-      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  sharedPublisherName: "Driver<\(Output.self)>",
-                                  completion: completion)
-      })
-      return makeDriver(failableSource: withTerminationDiagnostic)
-    } else {
-      return makeDriver(failableSource: self)
-    }
+    fatalError()
+//    func makeDriver(failableSource: some Publisher<Output, Failure> & Sendable) -> Driver<Output> {
+//      let infallible = failableSource.catch { failure in Just(catchError(failure)) }
+//      return Driver(infallibleUpstream: infallible, initialValue: initialValue, logWhenTerminated: false)
+//    }
+//
+//    if logWhenTerminated {
+//      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
+//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+//                                  sharedPublisherName: "Driver<\(Output.self)>",
+//                                  completion: completion)
+//      })
+//      return makeDriver(failableSource: withTerminationDiagnostic)
+//    } else {
+//      return makeDriver(failableSource: self)
+//    }
   }
 }
