@@ -7,8 +7,6 @@
 
 // MARK: - FilterAfterFirst Implementation 2
 
-import os
-
 extension AnyCurrentValuePublisher {
   public func filterAfterFirst(_ isIncluded: @Sendable @escaping (Output) -> Bool)
     -> AnyCurrentValuePublisher<Output, Failure> {

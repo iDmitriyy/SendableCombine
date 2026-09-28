@@ -34,3 +34,11 @@ extension SendableShell: ConnectablePublisher where Upstream: ConnectablePublish
     _upstream.connect()
   }
 }
+
+extension ConnectablePublisher where Self: Sendable, Output: Sendable {
+  @export(implementation)
+  public func autoconnect() -> some Publisher<Output, Failure> & Sendable {
+    let autoconnect: Publishers.Autoconnect<Self> = self.autoconnect()
+    return SendableShell<Publishers.Autoconnect<Self>>(_manuallyProven_Sendable__: autoconnect)
+  }
+}
