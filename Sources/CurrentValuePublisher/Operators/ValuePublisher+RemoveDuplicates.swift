@@ -6,7 +6,7 @@
 //
 
 extension AnyCurrentValuePublisher {
-  @export(implementation) @_transparent
+  @export(implementation)
   public func removeDuplicates(by predicate: @Sendable @escaping (Self.Output, Self.Output) -> Bool) -> Self {
     let removeDuplicates = Publishers.RemoveDuplicates(upstream: self, predicate: predicate)
     return Self(manuallyProven_SemiSendable: removeDuplicates)
@@ -14,7 +14,7 @@ extension AnyCurrentValuePublisher {
 }
 
 extension AnyCurrentValuePublisher where Output: Equatable & SendableMetatype {
-  @export(implementation) @_transparent
+  @export(implementation)
   public func removeDuplicates() -> Self {
     let isEqual: @Sendable (Output, Output) -> Bool = { $0 == $1 }
     return self.removeDuplicates(by: isEqual)
