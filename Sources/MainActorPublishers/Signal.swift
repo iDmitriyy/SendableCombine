@@ -8,6 +8,7 @@
 public import Combine
 import Foundation
 import SendableCombineLogging
+import SendablePublishers
 
 // MARK: - Core Signal Type
 
@@ -54,13 +55,9 @@ import SendableCombineLogging
 /// receive `.finished` immediately. To prevent these silent pipeline terminations during
 /// development, every factory initializer / conversion includes an optional `logWhenTerminated`
 /// parameter (enabled by default) that logs a diagnostic warning via `SendableCombineLogging`.
-public struct Signal<Element: Sendable> {
-  @usableFromInline internal let _upstream: AnyPublisher<Element, Never>
+public struct Signal<Element: Sendable>: Sendable {
+  @usableFromInline internal let _upstream: any Publisher<Element, Never> & Sendable
 }
-
-// MARK: - Sendable
-
-extension Signal: @unchecked Sendable where Element: Sendable {}
 
 // MARK: - Publisher Conformance
 
@@ -93,7 +90,7 @@ extension Signal where Element: Sendable {
 // MARK: - as Publisher
 
 extension Signal {
-  public func asPublisher() -> AnyPublisher<Element, Never> {
+  public func asPublisher() -> any Publisher<Element, Never> & Sendable {
     _upstream
   }
 }
@@ -120,12 +117,10 @@ extension Signal {
   ///   - infallibleUpstream: An existing publisher that is guaranteed never to fail (`Failure == Never`).
   ///   - logWhenTerminated: When `true` (default), logs upstream termination (`.finished` /
   ///     `.failure`) as a diagnostic warning; `false` disables the logging.
-  public init<P: Publisher>(infallibleUpstream: P,
-                            logWhenTerminated: Bool = true) where P.Output == Element, P.Failure == Never {
-    func makeSignal(_ source: some Publisher<Element, Never>) -> AnyPublisher<Element, Never> {
-      source.receive(on: DispatchQueue.main)
-        .share()
-        .eraseToAnyPublisher()
+  public init<P: Publisher & Sendable>(infallibleUpstream: P,
+                                       logWhenTerminated: Bool = true) where P.Output == Element, P.Failure == Never {
+    func makeSignal(_ source: some Publisher<Element, Never> & Sendable) -> any Publisher<Element, Never> & Sendable {
+      source.receive(on: DispatchQueue.main).share()
     }
 
     if logWhenTerminated {
@@ -143,7 +138,7 @@ extension Signal {
 
 // MARK: - Publisher as Signal (Infallible)
 
-extension Publisher where Failure == Never, Output: Sendable {
+extension Publisher where Self: Sendable, Failure == Never, Output: Sendable {
   /// Transforms an infallible publisher into a `Signal`.
   ///
   /// Use this operator when upstream is guaranteed never to fail and is
@@ -158,10 +153,10 @@ extension Publisher where Failure == Never, Output: Sendable {
 
 // MARK: - Publisher as Signal (Failable)
 
-extension Publisher where Output: Sendable {
+extension Publisher where Self: Sendable, Output: Sendable {
   /// Transforms a failable publisher into a `Signal`, dropping any generated errors silently.
   public func asSignalIgnoringError(logWhenTerminated: Bool = true) -> Signal<Output> {
-    func makeSignal(_ source: some Publisher<Output, Failure>) -> Signal<Output> {
+    func makeSignal(_ source: some Publisher<Output, Failure> & Sendable) -> Signal<Output> {
       let infallible = source.catch { _ in Empty<Output, Never>() }
       return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
     }

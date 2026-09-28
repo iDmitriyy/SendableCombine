@@ -119,7 +119,7 @@ extension Driver {
   ) where P.Output: Sendable, P.Output == Element, P.Failure == Never {
     let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
     let upstreamCancellable = infallibleUpstream.subscribe(bufferSubject)
-    
+
     self.init(infallibleCurrentValueSubject: bufferSubject,
               upstreamCancellable: upstreamCancellable,
               logWhenTerminated: logWhenTerminated)
@@ -131,11 +131,9 @@ extension Driver {
                 logWhenTerminated: Bool) {
     let upstream: any Publisher<Element, Never> & Sendable = if logWhenTerminated {
       infallibleCurrentValueSubject.handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(
-          logWhenTerminated: logWhenTerminated,
-          sharedPublisherName: "Driver<\(Output.self)>",
-          completion: completion,
-        )
+        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+                                  sharedPublisherName: "Driver<\(Output.self)>",
+                                  completion: completion)
       })
     } else {
       infallibleCurrentValueSubject
@@ -146,90 +144,13 @@ extension Driver {
       .SendablePublishers::makeConnectable()
 
     let connectionCancellable = connectable.connect()
-    
+
     let cancellable = AnyCancellable {
       connectionCancellable.cancel()
       upstreamCancellable?.cancel()
     }
-    
+
     self.init(_unchecked_HotUpstream: connectable,
               connectionCancellable: cancellable)
   }
-
-  /*
-    TBD: Do we need to log case when initialValue was dropped? This is the case when CurrentValueSubject
-   (and CurrentValuePublisher in common) is erased as Publisher and converted to Driver via asDriver + initialValue.
-   
-    public init<P: Publisher>(infallibleUpstream2: P,
-                              initialValue: Element,
-                              logWhenInitialValueDropped: Bool) where P.Output == Element, P.Failure == Never {
-      _upstream = Self.makeLazyInfallibleDriver(
-        infallibleUpstream2,
-        initialValue: initialValue,
-        logWhenInitialValueDropped: logWhenInitialValueDropped,
-      )
-    }
-
-   private static func makeLazyInfallibleDriver<P: Publisher>(_ infallibleUpstream: P,
-                                                              initialValue: Element,
-                                                              logWhenInitialValueDropped: Bool)
-     -> AnyPublisher<Element, Never> where P.Output == Element, P.Failure == Never {
-     let lock = OSAllocatedUnfairLock<SharedState>(uncheckedState: (publisher: nil, cancellable: nil))
-
-     /// Tiny shared signal only allocated when diagnostic logging is enabled.
-     let dropLock = logWhenInitialValueDropped
-       ? OSAllocatedUnfairLock<(hasSubscriber: Bool, didLog: Bool)>(uncheckedState: (hasSubscriber: false, didLog: false))
-       : nil
-
-     let lazyPublisher = Deferred {
-       lock.withLockUnchecked { state in
-         if let existing = state.publisher {
-           return existing
-         }
-
-         let bufferSubject = CurrentValueSubject<Element, Never>(initialValue)
-
-         let connectable = infallibleUpstream
-           .handleEvents(receiveOutput: { value in
-             // even if logWhenInitialValueDropped == true,performing handleEvents(receiveOutput:) on each
-             // emission is unneeded.
-             guard logWhenInitialValueDropped, let dropLock else { return }
-             let shouldLog = dropLock.withLock { signals in
-               guard !signals.didLog, !signals.hasSubscriber else { return false }
-               signals.didLog = true
-               return true
-             }
-             if shouldLog {
-               _log(.warning, SendableCombineLogEntry(
-                 code: .driverInitialValueDropped,
-                 message: "The initialValue (\(initialValue)) was dropped: the upstream emitted \(value) before the first subscriber attached (the upstream behaves like a hot observable or a replay(1) source). If the upstream is a CurrentValueSubject, prefer the no-argument asDriver(), which replays the subject's current value without an initialValue. If this behaviour is expected, pass logWhenInitialValueDropped: false.",
-               ))
-             }
-           })
-           .multicast(subject: bufferSubject)
-
-         let checkInitialValueDrop = connectable.handleEvents().sink { output in
-           // 1) log; 2) remove subscription
-           // TODO: can it be done this way?
-         }
-
-         state.cancellable = connectable.connect()
-
-         let shared = connectable
-           .handleEvents(receiveSubscription: { _ in
-             dropLock?.withLock { signals in
-               signals.hasSubscriber = true
-             }
-           })
-           .receive(on: DispatchQueue.main)
-           .eraseToAnyPublisher()
-
-         state.publisher = shared
-         return shared
-       }
-     }
-
-     return lazyPublisher.eraseToAnyPublisher()
-   }
-    */
 }
