@@ -7,7 +7,7 @@
 
 extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
-  public func `catch`<P: Publisher & Sendable>(
+  public func `catch2`<P: Publisher & Sendable>(
     _ handler: @Sendable @escaping (Failure) -> P,
   ) -> some Publisher<P.Output, P.Failure> & Sendable where P.Output == Output, P.Failure == Failure {
     let caught = Publishers.Catch(upstream: self, handler: handler)

@@ -7,7 +7,7 @@
 
 public import Combine
 import Foundation
-import SendableCombineLogging
+public import SendableCombineLogging
 import SendablePublishers
 
 // MARK: - Core Signal Type
@@ -153,43 +153,47 @@ extension Publisher where Self: Sendable, Failure == Never, Output: Sendable {
 
 // MARK: - Publisher as Signal (Failable)
 
-extension Publisher where Self: Sendable, Output: Sendable {
-  /// Transforms a failable publisher into a `Signal`, dropping any generated errors silently.
-  public func asSignalIgnoringError(logWhenTerminated: Bool = true) -> Signal<Output> {
-    func makeSignal(_ source: some Publisher<Output, Failure> & Sendable) -> Signal<Output> {
-      let infallible = source.catch { _ in Empty<Output, Never>() }
-      return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
-    }
-
-    if logWhenTerminated {
-      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  sharedPublisherName: "Signal<\(Output.self)>",
-                                  completion: completion)
-      })
-      return makeSignal(withTerminationDiagnostic)
-    } else {
-      return makeSignal(self)
-    }
-  }
-
-  /// Transforms a failable publisher into a `Signal`, recovering from errors with a fallback event.
-  public func asSignal(catchError: @Sendable @escaping () -> Output,
-                       logWhenTerminated: Bool = true) -> Signal<Output> {
-    func makeSignal(failableSource: some Publisher<Output, Failure>) -> Signal<Output> {
-      let infallible = failableSource.catch { _ in Just(catchError()) }
-      return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
-    }
-
-    if logWhenTerminated {
-      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
-        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
-                                  sharedPublisherName: "Signal<\(Output.self)>",
-                                  completion: completion)
-      })
-      return makeSignal(failableSource: withTerminationDiagnostic)
-    } else {
-      return makeSignal(failableSource: self)
-    }
-  }
-}
+//extension Publisher where Self: Sendable, Output: Sendable {
+//  /// Transforms a failable publisher into a `Signal`, dropping any generated errors silently.
+//  public func asSignalIgnoringError(logWhenTerminated: Bool = true) -> Signal<Output> {
+//    func makeSignal(_ source: some Publisher<Output, Failure> & Sendable) -> Signal<Output> {
+//      let infallible: any Publisher<Output, Never> & Sendable = source.SendablePublishers::`catch2` { _ in
+//        // true for logging error instead of silent termination
+//        let dd = SendablePublishers.empty(completeImmediately: true) as any Publisher<Output, Never> & Sendable
+//        return dd.eraseToAnyPublisher()
+//      }
+//      return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
+//    }
+//
+//    if logWhenTerminated {
+//      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
+//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+//                                  sharedPublisherName: "Signal<\(Output.self)>",
+//                                  completion: completion)
+//      })
+//      return makeSignal(withTerminationDiagnostic)
+//    } else {
+//      return makeSignal(self)
+//    }
+//  }
+//
+//  /// Transforms a failable publisher into a `Signal`, recovering from errors with a fallback event.
+//  public func asSignal(catchError: @Sendable @escaping () -> Output,
+//                       logWhenTerminated: Bool = true) -> Signal<Output> {
+//    func makeSignal(failableSource: some Publisher<Output, Failure> & Sendable) -> Signal<Output> {
+//      let infallible = failableSource.catch { _ in Just(catchError()) }
+//      return Signal(infallibleUpstream: infallible, logWhenTerminated: false)
+//    }
+//
+//    if logWhenTerminated {
+//      let withTerminationDiagnostic = handleEvents(receiveCompletion: { completion in
+//        _logTerminationDiagnostic(logWhenTerminated: logWhenTerminated,
+//                                  sharedPublisherName: "Signal<\(Output.self)>",
+//                                  completion: completion)
+//      })
+//      return makeSignal(failableSource: withTerminationDiagnostic)
+//    } else {
+//      return makeSignal(failableSource: self)
+//    }
+//  }
+//}

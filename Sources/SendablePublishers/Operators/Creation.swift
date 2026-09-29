@@ -10,7 +10,7 @@
 public enum SendablePublishers {
   @export(implementation)
   public static func empty<Output: Sendable, Failure: Error>(
-    completeImmediately: Bool = true,
+    completeImmediately: Bool,
   ) -> some Publisher<Output, Failure> & Sendable {
     let empty = Empty<Output, Failure>(completeImmediately: completeImmediately)
     return SendableShell<Empty<Output, Failure>>(_manuallyProven_Sendable__: empty)
