@@ -45,4 +45,28 @@ struct AnyCurrentValuePublisherTests {
 
     #expect(received == [42, 100])
   }
+
+  @Test("previousAndCurrent pairs each value with its predecessor")
+  func previousAndCurrent() {
+    let subject = CurrentValueSubject<Int, Never>(1)
+    let publisher = subject.asCurrentValuePublisher().previousAndCurrent()
+
+    let recorder = ValueRecorder<(previous: Int, current: Int)>()
+    let cancellable = publisher.sink { recorder.append($0) }
+
+    subject.send(2)
+    subject.send(3)
+    cancellable.cancel()
+
+    #expect(recorder.values.map { $0.previous } == [1, 1, 2])
+    #expect(recorder.values.map { $0.current } == [1, 2, 3])
+  }
+}
+
+private final class ValueRecorder<Value>: @unchecked Sendable {
+  private(set) var values: [Value] = []
+
+  func append(_ value: Value) {
+    values.append(value)
+  }
 }
