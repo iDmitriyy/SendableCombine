@@ -13,15 +13,14 @@ let package = Package(
     .library(name: "CancellationBag", targets: ["CancellationBag"]),
   ],
   targets: [
-    .target(name: "SendablePublishers"),
+    .target(name: "SendablePublishers",
+            dependencies: ["CancellationBag"]),
     .target(name: "CancellationBag",
             dependencies: ["SendableCombineLogging"],
             swiftSettings: [
               .enableExperimentalFeature("StaticExclusiveOnly"),
               .unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release)),
             ]),
-    .target(name: "SendableCombineLogging",
-            swiftSettings: [.unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release))]),
     .target(name: "CurrentValuePublisher",
             dependencies: ["SendablePublishers"]),
     .target(name: "MainActorPublishers",
@@ -33,6 +32,8 @@ let package = Package(
               "CurrentValuePublisher",
               "MainActorPublishers",
             ]),
+    .target(name: "SendableCombineLogging",
+            swiftSettings: [.unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release))]),
     
     // MARK: - Test Targets
     

@@ -6,6 +6,7 @@
 //
 
 @_exported public import Combine
+@_exported public import CancellationBag
 
 // MARK: - Protocol
 
