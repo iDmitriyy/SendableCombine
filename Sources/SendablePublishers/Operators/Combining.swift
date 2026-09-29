@@ -18,7 +18,7 @@ extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func merge<B: Publisher & Sendable, C: Publisher & Sendable>(
     with b: B,
-    c: C,
+    _ c: C,
   ) -> some Publisher<Output, Failure> & Sendable
     where B.Output == Output, B.Failure == Failure,
     C.Output == Output, C.Failure == Failure {
@@ -29,8 +29,8 @@ extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func merge<B: Publisher & Sendable, C: Publisher & Sendable, D: Publisher & Sendable>(
     with b: B,
-    c: C,
-    d: D,
+    _ c: C,
+    _ d: D,
   ) -> some Publisher<Output, Failure> & Sendable
     where B.Output == Output, B.Failure == Failure,
     C.Output == Output, C.Failure == Failure,
@@ -42,9 +42,9 @@ extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func merge<B: Publisher & Sendable, C: Publisher & Sendable, D: Publisher & Sendable, E: Publisher & Sendable>(
     with b: B,
-    c: C,
-    d: D,
-    e: E,
+    _ c: C,
+    _ d: D,
+    _ e: E,
   ) -> some Publisher<Output, Failure> & Sendable
     where B.Output == Output, B.Failure == Failure,
     C.Output == Output, C.Failure == Failure,
@@ -57,10 +57,10 @@ extension Publisher where Self: Sendable, Output: Sendable {
   @export(implementation)
   public func merge<B: Publisher & Sendable, C: Publisher & Sendable, D: Publisher & Sendable, E: Publisher & Sendable, F: Publisher & Sendable>(
     with b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
+    _ c: C,
+    _ d: D,
+    _ e: E,
+    _ f: F,
   ) -> some Publisher<Output, Failure> & Sendable
     where B.Output == Output, B.Failure == Failure,
     C.Output == Output, C.Failure == Failure,
@@ -70,47 +70,7 @@ extension Publisher where Self: Sendable, Output: Sendable {
     let merged = Publishers.Merge6(self, b, c, d, e, f)
     return SendableShell<Publishers.Merge6<Self, B, C, D, E, F>>(_manuallyProven_Sendable__: merged)
   }
-
-  @export(implementation)
-  public func merge<B: Publisher & Sendable, C: Publisher & Sendable, D: Publisher & Sendable, E: Publisher & Sendable, F: Publisher & Sendable, G: Publisher & Sendable>(
-    with b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-  ) -> some Publisher<Output, Failure> & Sendable
-    where B.Output == Output, B.Failure == Failure,
-    C.Output == Output, C.Failure == Failure,
-    D.Output == Output, D.Failure == Failure,
-    E.Output == Output, E.Failure == Failure,
-    F.Output == Output, F.Failure == Failure,
-    G.Output == Output, G.Failure == Failure {
-    let merged = Publishers.Merge7(self, b, c, d, e, f, g)
-    return SendableShell<Publishers.Merge7<Self, B, C, D, E, F, G>>(_manuallyProven_Sendable__: merged)
-  }
-
-  @export(implementation)
-  public func merge<B: Publisher & Sendable, C: Publisher & Sendable, D: Publisher & Sendable, E: Publisher & Sendable, F: Publisher & Sendable, G: Publisher & Sendable, H: Publisher & Sendable>(
-    with b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-  ) -> some Publisher<Output, Failure> & Sendable
-    where B.Output == Output, B.Failure == Failure,
-    C.Output == Output, C.Failure == Failure,
-    D.Output == Output, D.Failure == Failure,
-    E.Output == Output, E.Failure == Failure,
-    F.Output == Output, F.Failure == Failure,
-    G.Output == Output, G.Failure == Failure,
-    H.Output == Output, H.Failure == Failure {
-    let merged = Publishers.Merge8(self, b, c, d, e, f, g, h)
-    return SendableShell<Publishers.Merge8<Self, B, C, D, E, F, G, H>>(_manuallyProven_Sendable__: merged)
-  }
-
+  
   @export(implementation)
   public func merge(with other: Self, _ others: Self...)
     -> some Publisher<Output, Failure> & Sendable {

@@ -36,6 +36,18 @@ extension Publisher where Self: Sendable, Output: Sendable {
   }
 
   @export(implementation)
+  public func breakpoint(
+    receiveSubscription: (@Sendable (any Subscription) -> Bool)? = nil,
+    receiveOutput: (@Sendable (Self.Output) -> Bool)? = nil,
+    receiveCompletion: (@Sendable (Subscribers.Completion<Self.Failure>) -> Bool)? = nil
+  ) -> some Publisher<Output, Failure> & Sendable {
+    let breakpoint = self.Combine::breakpoint(receiveSubscription: receiveSubscription,
+                                              receiveOutput: receiveOutput,
+                                              receiveCompletion: receiveCompletion)
+    return SendableShell<Publishers.Breakpoint<Self>>(_manuallyProven_Sendable__: breakpoint)
+  }
+  
+  @export(implementation)
   public func print(
     _ prefix: String = "",
     to stream: (any TextOutputStream)? = nil,

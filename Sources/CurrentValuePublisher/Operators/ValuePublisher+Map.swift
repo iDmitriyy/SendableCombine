@@ -13,13 +13,6 @@ extension AnyCurrentValuePublisher {
   }
 }
 
-// public func combineLatest<P>(_ other: P) -> Publishers.CombineLatest<Self, P> where P : Publisher, Self.Failure == P.Failure
-//
-// public func combineLatest<P, T>(_ other: P, _ transform: @escaping (Self.Output, P.Output) -> T) -> Publishers.Map<Publishers.CombineLatest<Self, P>, T> where P : Publisher, Self.Failure == P.Failure
-
-extension Publishers {
-  struct SingleElement {}
-}
 
 /*
  ValuePublisher operators:
